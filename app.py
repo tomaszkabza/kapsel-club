@@ -8,24 +8,61 @@ from io import BytesIO
 # Konfiguracja strony pod smartfona
 st.set_page_config(page_title="Kapsel Club Browar", layout="centered")
 
-# Stylizacja paska i barw w aplikacji
+# --- KLUBOWA STYLIZACJA CSS (ŻÓŁTO-BIAŁO-ZIELONA) ---
 st.markdown("""
     <style>
+    /* Tło aplikacji */
     .main { background-color: #FFFFFF; }
-    h1, h2, h3 { color: #2E7D32 !important; font-family: 'Segoe UI', sans-serif; }
-    .stButton>button { background-color: #2E7D32; color: white; border-radius: 5px; }
-    .stButton>button:hover { background-color: #1B5E20; color: white; }
-    div[data-testid="stDataFrame"] { background-color: #FFF9C4; }
+    
+    /* Główne nagłówki - Klubowa Zieleń */
+    h1, h2, h3 { color: #1B5E20 !important; font-family: 'Segoe UI', sans-serif; font-weight: bold; }
+    
+    /* Przyciski (np. Dodaj do listy, Zapisz) - Zielone z białym tekstem */
+    .stButton>button { 
+        background-color: #1B5E20; 
+        color: #FFFFFF; 
+        border-radius: 6px; 
+        border: 2px solid #1B5E20;
+        font-weight: bold;
+    }
+    .stButton>button:hover { 
+        background-color: #FFF9C4; 
+        color: #1B5E20; 
+        border: 2px solid #1B5E20;
+    }
+    
+    /* Specjalny styl dla Niebieskiego przycisku pobierania - zmieniony na Złoty/Żółty akcent */
+    div[data-testid="stDownloadButton"] > button {
+        background-color: #FBC02D;
+        color: #1B5E20;
+        border-radius: 6px;
+        border: 2px solid #1B5E20;
+        font-weight: bold;
+    }
+    div[data-testid="stDownloadButton"] > button:hover {
+        background-color: #1B5E20;
+        color: #FFFFFF;
+    }
+
+    /* Wygląd tabel w aplikacji - dopasowany do stylistyki Excela */
+    div[data-testid="stDataFrame"] { 
+        border: 1px solid #1B5E20;
+        border-radius: 6px;
+    }
+    
+    /* Stylizacja zakładek na górze */
+    button[data-testid="stMarkdownContainer"] p {
+        font-weight: bold;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🏆 Kapsel Club Browar")
 st.subheader("Oficjalny Panel Live • Puchar Lata 2026")
 
-# Nazwa Twojego oficjalnego pliku na GitHubie
 EXCEL_FILE = "Puchar_Lata_2026_Browar.xlsx"
 
-# Inicjalizacja stałej historii w aplikacji na start
+# Inicjalizacja bazy
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
     st.session_state.players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR']
@@ -56,12 +93,10 @@ def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
     return pts_map.get(rank, 0)
 
-# FUNKCJA: Modyfikowanie oryginalnego pliku Excel i przesuwanie generalki w dół
 def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsza):
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
     ws = wb["Puchar Lata 2026"]
     
-    # 1. Znajdujemy wiersz z Klasyfikacją Generalną
     gen_header_row = None
     for row in range(1, 300):
         val = ws.cell(row=row, column=2).value
@@ -70,15 +105,11 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
             break
             
     if not gen_header_row:
-        gen_header_row = 29 # awaryjny punkt odniesienia
+        gen_header_row = 29
         
-    # 2. Wstawiamy dokładnie 12 nowych wierszy TUŻ przed nagłówkiem Generalki (czysta przestrzeń na nową rundę)
     ws.insert_rows(idx=gen_header_row - 1, amount=12)
-    
-    # Punkt startowy dla wstawienia nowej tabeli rundy wyliczany dynamicznie
     start_r = gen_header_row - 1
     
-    # 3. Definiujemy style graficzne idealnie zgodne z Twoim Excelem
     font_normal = Font(name="Calibri", size=11)
     font_bold = Font(name="Calibri", size=11, bold=True)
     font_title = Font(name="Calibri", size=11, italic=True, color="555555")
@@ -94,15 +125,12 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         bottom=Side(style='thin', color='CCCCCC')
     )
     
-    # Nagłówek opisowy rundy (np. Runda III • Piątek, 24.07.2026)
     r_roman = {1:"I", 2:"II", 3:"III", 4:"IV", 5:"V", 6:"VI", 7:"VII", 8:"VIII", 9:"IX", 10:"X", 11:"XI", 12:"XII"}.get(nr_rundy, str(nr_rundy))
     ws.cell(row=start_r, column=2, value=f"Runda {r_roman} • Piątek, {data_dzisiejsza}").font = font_title
     start_r += 1
     
-    # Sortujemy kolumny zawodników od najlepszego w tej rundzie
     active_sorted = list(df_live_results["Zawodnik"].values)
     
-    # Nagłówki tabeli wyścigu
     ws.cell(row=start_r, column=2, value="Bieg").font = font_bold
     ws.cell(row=start_r, column=2).fill = fill_green
     ws.cell(row=start_r, column=2).font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
@@ -117,7 +145,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.border = thin_border
     start_r += 1
     
-    # Wprowadzanie punktów za 5 biegów
     for b in range(5):
         ws.cell(row=start_r, column=2, value=f"Bieg {b+1}").font = font_bold
         ws.cell(row=start_r, column=2).border = thin_border
@@ -130,7 +157,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
             cell.alignment = Alignment(horizontal="center")
         start_r += 1
         
-    # Wiersz: Suma punktów
     cell_lbl1 = ws.cell(row=start_r, column=2, value="Suma punktów")
     cell_lbl1.font = font_bold; cell_lbl1.fill = fill_yellow_light; cell_lbl1.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
@@ -138,7 +164,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.font = font_bold; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
     start_r += 1
     
-    # Wiersz: Średnia na bieg
     cell_lbl2 = ws.cell(row=start_r, column=2, value="Średnia na bieg")
     cell_lbl2.font = font_bold; cell_lbl2.fill = fill_yellow_light; cell_lbl2.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
@@ -146,7 +171,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.font = font_normal; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
     start_r += 1
     
-    # Wiersz: Miejsce
     cell_lbl3 = ws.cell(row=start_r, column=2, value="Miejsce")
     cell_lbl3.font = font_bold; cell_lbl3.fill = fill_gray_light; cell_lbl3.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
@@ -154,26 +178,21 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.font = font_normal; cell.fill = fill_gray_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
     start_r += 1
     
-    # Wiersz: Punkty Turniejowe
     cell_lbl4 = ws.cell(row=start_r, column=2, value="Punkty Turniejowe")
     cell_lbl4.font = font_bold; cell_lbl4.fill = fill_yellow_light; cell_lbl4.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
         cell = ws.cell(row=start_r, column=c_idx, value=int(df_live_results[df_live_results["Zawodnik"] == player]["Pkt Turniejowe"].values[0]))
         cell.font = font_bold; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
         
-    # 4. AKTUALIZACJA TABELI GENERALNEJ (zjechała w dół przez insert_rows)
-    # Odnajdujemy nowy numer wiersza nagłówka tabeli generalnej po przesunięciu
     new_gen_header = None
     for row in range(1, 350):
         val = ws.cell(row=row, column=2).value
         if val and "KLASYFIKACJA GENERALNA PUCHARU" in str(val):
-            new_gen_header = row + 1 # wiersz nagłówków kolumn (Poz., Zawodnik, R1...)
+            new_gen_header = row + 1
             break
             
-    # Wpisujemy uzyskane punkty turniejowe w odpowiednią kolumnę rundy (Kolumna D=R1, E=R2, F=R3...)
     target_col = 3 + nr_rundy 
     
-    # Przeszukujemy wiersze tabeli generalnej pod nagłówkiem i uzupełniamy zdobycze punktowe
     for r in range(new_gen_header + 1, new_gen_header + 25):
         z_name = ws.cell(row=r, column=3).value
         if z_name:
@@ -184,7 +203,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
             else:
                 ws.cell(row=r, column=target_col, value="-").alignment = Alignment(horizontal="center")
                 
-    # Zapis zmodyfikowanego skoroszytu Excela do pamięci strumienia
     out = BytesIO()
     wb.save(out)
     out.seek(0)
@@ -253,10 +271,10 @@ with tab1:
         df_live.insert(0, 'Miejsce', df_live.index)
         df_live["Pkt Turniejowe"] = df_live["Miejsce"].apply(get_tournament_points)
         
-        st.dataframe(df_live, use_container_width=True, hide_index=True)
+        # Kolorowanie tabeli na żywo (odcienie zieleni)
+        st.dataframe(df_live.style.background_gradient(cmap="Greens", subset=["Suma"]), use_container_width=True, hide_index=True)
         
         if st.button("💾 ZAPISZ OFICJALNE WYNIKI RUNDY"):
-            # 1. Zapisujemy do pamięci podręcznej aplikacji
             for p in st.session_state.players:
                 if p in df_live["Zawodnik"].values:
                     wywalczone = int(df_live[df_live["Zawodnik"] == p]["Pkt Turniejowe"].values[0])
@@ -269,7 +287,6 @@ with tab1:
                 live_matrix[p] = scores[p]
             st.session_state.heats_archive[nr_rundy] = pd.DataFrame(live_matrix)
             
-            # 2. Generujemy gotową modyfikację oryginalnego Excela z zachowaniem kolorów i formuł
             st.session_state.excel_data = update_original_excel(nr_rundy, scores, df_live, data_dzisiejsza)
             st.session_state.excel_ready = True
             st.success(f"Pomyślnie podliczono Rundę {nr_rundy}!")
@@ -308,6 +325,7 @@ with tab1:
     df_gen.index += 1
     df_gen.insert(0, 'Poz.', df_gen.index)
     
+    # Podświetlenie kolumny SUMA na pastelowo-żółto, identycznie jak w Waszym Excelu
     st.dataframe(df_gen.style.set_properties(**{'background-color': '#FFF9C4'}, subset=['SUMA PUNKTÓW']), use_container_width=True, hide_index=True)
 
 # --- TAB 2: HISTORIA RUND (1-12) ---
