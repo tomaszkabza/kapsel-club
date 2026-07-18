@@ -89,16 +89,16 @@ if "initialized" not in st.session_state:
     st.session_state.heats_archive = {
         1: pd.DataFrame({
             "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
-            "JAC": [5, 4, 3, 2, 2], "PAW": [2, 1, 2, 1, 1], "RDX": [8, 10, 8, 6, 7], 
-            "SIW": [4, 3, 4, 3, 4], "BĄB": [6, 7, 5, 4, 5], "SZP": [3, 2, 6, 5, 3],
-            "PYR": [1, 5, 1, 7, 6], "DAN": [10, 8, 10, 10, 10], "DOM": [7, 6, 7, 0, 0]
+            "JAC": [5.0, 4.0, 3.0, 2.0, 2.0], "PAW": [2.0, 1.0, 2.0, 1.0, 1.0], "RDX": [8.0, 10.0, 8.0, 6.0, 7.0], 
+            "SIW": [4.0, 3.0, 4.0, 3.0, 4.0], "BĄB": [6.0, 7.0, 5.0, 4.0, 5.0], "SZP": [3.0, 2.0, 6.0, 5.0, 3.0],
+            "PYR": [1.0, 5.0, 1.0, 7.0, 6.0], "DAN": [10.0, 8.0, 10.0, 10.0, 10.0], "DOM": [7.0, 6.0, 7.0, 0.0, 0.0]
         }),
         2: pd.DataFrame({
             "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
-            "JAC": [1, 1, 9, 10, 3], "DAR": [7, 5, 5, 3, 0], "CYG": [4, 4, 3, 9, 1],
-            "PAW": [6, 0, 6, 5, 8],  "RDX": [10, 7, 2, 0, 10], "KRO": [8, 8, 7, 8, 2],
-            "SIW": [3, 6, 10, 6, 6], "BĄB": [0, 10, 1, 7, 7], "SZP": [2, 2, 4, 1, 4],
-            "PYR": [5, 3, 0, 2, 5],  "DAN": [9, 9, 8, 4, 9]
+            "JAC": [1.0, 1.0, 9.0, 10.0, 3.0], "DAR": [7.0, 5.0, 5.0, 3.0, 0.0], "CYG": [4.0, 4.0, 3.0, 9.0, 1.0],
+            "PAW": [6.0, 0.0, 6.0, 5.0, 8.0],  "RDX": [10.0, 7.0, 2.0, 0.0, 10.0], "KRO": [8.0, 8.0, 7.0, 8.0, 2.0],
+            "SIW": [3.0, 6.0, 10.0, 6.0, 6.0], "BĄB": [0.0, 10.0, 1.0, 7.0, 7.0], "SZP": [2.0, 2.0, 4.0, 1.0, 4.0],
+            "PYR": [5.0, 3.0, 0.0, 2.0, 5.0],  "DAN": [9.0, 9.0, 8.0, 4.0, 9.0]
         })
     }
     st.session_state.excel_ready = False
@@ -108,31 +108,12 @@ def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
     return pts_map.get(rank, 0)
 
-# FUNKCJA: Nakładanie kolorów i POPRAWNEGO FORMATOWANIA LICZB (bez zbędnych zer)
+# FUNKCJA: Bezpieczne formatowanie wyświetlania i kolorowanie w stylu Excela
 def style_matrix_like_excel(df):
-    # Tworzymy słownik formatowania dla każdej kolumny zawodnika
-    format_dict = {}
-    for col in df.columns:
-        if col != "Bieg":
-            # Ta funkcja sprawdza każdy wiersz w danej kolumnie i decyduje o liczbie miejsc po przecinku
-            format_dict[col] = lambda val, df=df: f"{val:.1f}" if str(df.loc[df[df.columns[df.columns.get_loc(col)]] == val, "Bieg"].values).find("Średnia") != -1 else f"{int(float(val))}"
-            
-    # Ponieważ dynamiczne formatowanie lambda na wierszach w st.dataframe bywa kapryśne, 
-    # najbezpieczniejszym sposobem na usunięcie .000000 przy zachowaniu kolorowania jest tekstowe przygotowanie wartości w komórkach:
-    df_clean = df.copy()
-    for col in df_clean.columns:
-        if col != "Bieg":
-            for idx, row in df_clean.iterrows():
-                val = row[col]
-                if df_clean.loc[idx, "Bieg"] == "Średnia na bieg":
-                    df_clean.loc[idx, col] = f"{float(val):.1f}"
-                else:
-                    df_clean.loc[idx, col] = f"{int(float(val))}"
-
     def get_row_styles(row):
         styles = []
         row_label = str(row["Bieg"])
-        for col in df_clean.columns:
+        for col in df.columns:
             if row_label in ["Bieg 1", "Bieg 3", "Bieg 5"]:
                 styles.append("background-color: #FFFFFF; color: #000000; text-align: center;")
             elif row_label in ["Bieg 2", "Bieg 4"]:
@@ -145,7 +126,18 @@ def style_matrix_like_excel(df):
                 styles.append("background-color: #FFFFFF; color: #000000; text-align: center;")
         return styles
 
-    return df_clean.style.apply(get_row_styles, axis=1)
+    # Tworzymy bezpieczną mapę formatowania dla widoku
+    format_rules = {}
+    for idx, row in df.iterrows():
+        row_label = str(row["Bieg"])
+        for col in df.columns:
+            if col != "Bieg":
+                if row_label == "Średnia na bieg":
+                    format_rules[(idx, df.columns.get_loc(col))] = "{:.1f}"
+                else:
+                    format_rules[(idx, df.columns.get_loc(col))] = "{:.0f}"
+
+    return df.style.apply(get_row_styles, axis=1).format(format_rules)
 
 def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsza):
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
@@ -317,7 +309,7 @@ with tab1:
         for p, b_vals in scores.items():
             suma = sum(b_vals)
             srednia = round(np.mean(b_vals), 1)
-            live_rows.append({"Zawodnik": p, "Suma": suma, "Średnia": srednia})
+            live_rows.append({"Zawodnik": p, "Suma": float(suma), "Średnia": float(srednia)})
             
         df_live = pd.DataFrame(live_rows)
         df_live = df_live.sort_values(by="Suma", ascending=False).reset_index(drop=True)
@@ -330,15 +322,15 @@ with tab1:
         st.write("### 🏁 Podgląd Tabeli Biegowej Rundy:")
         live_matrix = {"Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"]}
         for p in list(df_live["Zawodnik"].values):
-            live_matrix[p] = scores[p]
+            live_matrix[p] = [float(x) for x in scores[p]]
         df_live_mat = pd.DataFrame(live_matrix)
         
         sums_l = ["Suma punktów"]; avg_l = ["Średnia na bieg"]; rk_l = ["Miejsce"]; pt_l = ["Punkty Turniejowe"]
         for p in list(df_live["Zawodnik"].values):
-            sums_l.append(df_live[df_live["Zawodnik"] == p]["Suma"].values[0])
-            avg_l.append(df_live[df_live["Zawodnik"] == p]["Średnia"].values[0])
-            rk_l.append(df_live[df_live["Zawodnik"] == p]["Miejsce"].values[0])
-            pt_l.append(df_live[df_live["Zawodnik"] == p]["Pkt Turniejowe"].values[0])
+            sums_l.append(float(df_live[df_live["Zawodnik"] == p]["Suma"].values[0]))
+            avg_l.append(float(df_live[df_live["Zawodnik"] == p]["Średnia"].values[0]))
+            rk_l.append(float(df_live[df_live["Zawodnik"] == p]["Miejsce"].values[0]))
+            pt_l.append(float(df_live[df_live["Zawodnik"] == p]["Pkt Turniejowe"].values[0]))
             
         df_live_extra = pd.DataFrame(columns=df_live_mat.columns)
         df_live_extra.loc[len(df_live_extra)] = sums_l
@@ -357,7 +349,12 @@ with tab1:
                 else:
                     st.session_state.history[p].append(0)
             
-            st.session_state.heats_archive[nr_rundy] = df_live_mat
+            # Konwersja z powrotem do int przed archiwizacją
+            live_matrix_int = {"Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"]}
+            for p in active_today:
+                live_matrix_int[p] = scores[p]
+            st.session_state.heats_archive[nr_rundy] = pd.DataFrame(live_matrix_int)
+            
             st.session_state.excel_data = update_original_excel(nr_rundy, scores, df_live, data_dzisiejsza)
             st.session_state.excel_ready = True
             st.success(f"Pomyślnie podliczono Rundę {nr_rundy}!")
@@ -411,6 +408,10 @@ with tab2:
         sorted_cols_by_sum = sorted(player_cols, key=lambda p: df_arch[p].sum(), reverse=True)
         df_arch = df_arch[["Bieg"] + sorted_cols_by_sum]
         
+        # Konwertujemy kolumny archiwalne na float, by formatowanie zadziałało bez błędów typu
+        for col in sorted_cols_by_sum:
+            df_arch[col] = df_arch[col].astype(float)
+            
         sums = ["Suma punktów"]
         averages = ["Średnia na bieg"]
         ranks = ["Miejsce"]
@@ -420,8 +421,8 @@ with tab2:
         for p in sorted_cols_by_sum:
             s_val = df_arch[p].sum()
             player_totals[p] = s_val
-            sums.append(s_val)
-            averages.append(round(df_arch[p].mean(), 1))
+            sums.append(float(s_val))
+            averages.append(float(df_arch[p].mean()))
             
         sorted_players_by_sum = sorted(player_totals.items(), key=lambda x: x[1], reverse=True)
         player_ranks = {}
@@ -430,8 +431,8 @@ with tab2:
             
         for p in sorted_cols_by_sum:
             rk = player_ranks[p]
-            ranks.append(rk)
-            t_points.append(get_tournament_points(rk))
+            ranks.append(float(rk))
+            t_points.append(float(get_tournament_points(rk)))
             
         df_extra = pd.DataFrame(columns=df_arch.columns)
         df_extra.loc[len(df_extra)] = sums
