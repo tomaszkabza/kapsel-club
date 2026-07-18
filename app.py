@@ -13,7 +13,7 @@ st.markdown("""
     <style>
     /* Zdjęcie jako tło całej strony */
     .stApp {
-        background-image: url("https://raw.githubusercontent.com/tomaszkabza/kapsel-club/main/tlo.png");
+        background-image: url("https://raw.githubusercontent.com/tomaszkabza/kapsel-club/main/tlo.jpg");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
@@ -108,7 +108,27 @@ def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
     return pts_map.get(rank, 0)
 
-# FUNKCJA: Modyfikacja pliku Excel z zachowaniem struktury pionowej i formuł
+# FUNKCJA: Nakładanie kolorów identycznych z Excelem na tabele w aplikacji
+def style_matrix_like_excel(df):
+    def get_row_styles(row):
+        styles = []
+        row_label = str(row["Bieg"])
+        
+        for col in df.columns:
+            if row_label in ["Bieg 1", "Bieg 3", "Bieg 5"]:
+                styles.append("background-color: #FFFFFF; color: #000000;")
+            elif row_label in ["Bieg 2", "Bieg 4"]:
+                styles.append("background-color: #E8F5E9; color: #000000;") # pastelowa mięta
+            elif row_label in ["Suma punktów", "Średnia na bieg", "Punkty Turniejowe"]:
+                styles.append("background-color: #FFF9C4; color: #000000; font-weight: bold;") # pastelowy żółty
+            elif row_label == "Miejsce":
+                styles.append("background-color: #F5F5F5; color: #000000; font-weight: bold;") # jasnoszary
+            else:
+                styles.append("background-color: #FFFFFF; color: #000000;")
+        return styles
+
+    return df.style.apply(get_row_styles, axis=1)
+
 def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsza):
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
     ws = wb["Puchar Lata 2026"]
@@ -289,6 +309,30 @@ with tab1:
         
         st.dataframe(df_live.style.background_gradient(cmap="Greens", subset=["Suma"]), use_container_width=True, hide_index=True)
         
+        # --- NOWOŚĆ: Podgląd bieżącej macierzy biegów sformatowany jak Excel ---
+        st.write("### 🏁 Podgląd Tabeli Biegowej Rundy:")
+        live_matrix = {"Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"]}
+        for p in list(df_live["Zawodnik"].values):
+            live_matrix[p] = scores[p]
+        df_live_mat = pd.DataFrame(live_matrix)
+        
+        # Przygotowanie wierszy podsumowania na żywo
+        sums_l = ["Suma punktów"]; avg_l = ["Średnia na bieg"]; rk_l = ["Miejsce"]; pt_l = ["Punkty Turniejowe"]
+        for p in list(df_live["Zawodnik"].values):
+            sums_l.append(int(df_live[df_live["Zawodnik"] == p]["Suma"].values[0]))
+            avg_l.append(float(df_live[df_live["Zawodnik"] == p]["Średnia"].values[0]))
+            rk_l.append(int(df_live[df_live["Zawodnik"] == p]["Miejsce"].values[0]))
+            pt_l.append(int(df_live[df_live["Zawodnik"] == p]["Pkt Turniejowe"].values[0]))
+            
+        df_live_extra = pd.DataFrame(columns=df_live_mat.columns)
+        df_live_extra.loc[len(df_live_extra)] = sums_l
+        df_live_extra.loc[len(df_live_extra)] = avg_l
+        df_live_extra.loc[len(df_live_extra)] = rk_l
+        df_live_extra.loc[len(df_live_extra)] = pt_l
+        
+        df_live_full = pd.concat([df_live_mat, df_live_extra], ignore_index=True)
+        st.dataframe(style_matrix_like_excel(df_live_full), use_container_width=True, hide_index=True)
+        
         if st.button("💾 ZAPISZ OFICJALNE WYNIKI RUNDY"):
             for p in st.session_state.players:
                 if p in df_live["Zawodnik"].values:
@@ -297,11 +341,7 @@ with tab1:
                 else:
                     st.session_state.history[p].append(0)
             
-            live_matrix = {"Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"]}
-            for p in active_today:
-                live_matrix[p] = scores[p]
-            st.session_state.heats_archive[nr_rundy] = pd.DataFrame(live_matrix)
-            
+            st.session_state.heats_archive[nr_rundy] = df_live_mat
             st.session_state.excel_data = update_original_excel(nr_rundy, scores, df_live, data_dzisiejsza)
             st.session_state.excel_ready = True
             st.success(f"Pomyślnie podliczono Rundę {nr_rundy}!")
@@ -385,4 +425,6 @@ with tab2:
         df_extra.loc[len(df_extra)] = t_points
         
         df_full_display = pd.concat([df_arch, df_extra], ignore_index=True)
-        st.dataframe(df_full_display, use_container_width=True, hide_index=True)
+        
+        # Uruchomienie precyzyjnego kolorowania w archiwum
+        st.dataframe(style_matrix_like_excel(df_full_display), use_container_width=True, hide_index=True)
