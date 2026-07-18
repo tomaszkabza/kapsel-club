@@ -124,7 +124,7 @@ with tab1:
     st.write("---")
     # Ustalamy numer kolejnej rundy automatycznie na podstawie danych z Excela
     ile_rund_w_pliku = len(list(st.session_state.history.values())[0]) if st.session_state.history else 2
-    nr_rundy = st.number_input("Numer rozgrywanej rundy", min_value=3, max_value=12, value=ile_rund_w_pliku + 1)
+    r_rundy = st.number_input("Numer rozgrywanej rundy", min_value=1, max_value=100, value=3)
     
     st.write("**Zaznacz zawodników startujących dzisiaj:**")
     active_today = []
