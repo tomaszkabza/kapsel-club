@@ -8,11 +8,26 @@ from io import BytesIO
 # Konfiguracja strony pod smartfona
 st.set_page_config(page_title="Kapsel Club Browar", layout="centered")
 
-# --- KLUBOWA STYLIZACJA CSS (ŻÓŁTO-BIAŁO-ZIELONA) ---
+# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE ---
 st.markdown("""
     <style>
-    /* Tło aplikacji */
-    .main { background-color: #FFFFFF; }
+    /* Zdjęcie jako tło całej strony */
+    .stApp {
+        background-image: url("https://raw.githubusercontent.com/tomaszkabza/kapsel-club/main/tlo.png");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }
+    
+    /* Półprzezroczyste białe tło pod tekstami dla idealnej czytelności na słońcu */
+    .block-container {
+        background-color: rgba(255, 255, 255, 0.94);
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        margin-top: 2rem;
+    }
     
     /* Główne nagłówki - Klubowa Zieleń */
     h1, h2, h3 { color: #1B5E20 !important; font-family: 'Segoe UI', sans-serif; font-weight: bold; }
@@ -31,7 +46,7 @@ st.markdown("""
         border: 2px solid #1B5E20;
     }
     
-    /* Specjalny styl dla Niebieskiego przycisku pobierania - zmieniony na Złoty/Żółty akcent */
+    /* Złoty przycisk pobierania Excela */
     div[data-testid="stDownloadButton"] > button {
         background-color: #FBC02D;
         color: #1B5E20;
@@ -44,13 +59,12 @@ st.markdown("""
         color: #FFFFFF;
     }
 
-    /* Wygląd tabel w aplikacji - dopasowany do stylistyki Excela */
+    /* Wygląd tabel w aplikacji */
     div[data-testid="stDataFrame"] { 
         border: 1px solid #1B5E20;
         border-radius: 6px;
     }
     
-    /* Stylizacja zakładek na górze */
     button[data-testid="stMarkdownContainer"] p {
         font-weight: bold;
     }
@@ -60,9 +74,10 @@ st.markdown("""
 st.title("🏆 Kapsel Club Browar")
 st.subheader("Oficjalny Panel Live • Puchar Lata 2026")
 
+# Nazwa oficjalnego pliku bazowego w repozytorium
 EXCEL_FILE = "Puchar_Lata_2026_Browar.xlsx"
 
-# Inicjalizacja bazy
+# Inicjalizacja bazy i historii rund 1 i 2 (stan faktyczny z Excela)
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
     st.session_state.players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR']
@@ -93,6 +108,7 @@ def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
     return pts_map.get(rank, 0)
 
+# FUNKCJA: Modyfikacja pliku Excel z zachowaniem struktury pionowej i formuł
 def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsza):
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
     ws = wb["Puchar Lata 2026"]
@@ -210,7 +226,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
 
 tab1, tab2 = st.tabs(["🏠 STRONA GŁÓWNA (LIVE & GENERALNA)", "📚 HISTORIA RUND (1-12)"])
 
-# --- TAB 1: STRONA GŁÓWNA (LIVE & GENERALNA) ---
+# --- TAB 1: STRONA GŁÓWNA ---
 with tab1:
     st.header("⚡ Aktualna Runda na Żywo")
     
@@ -271,7 +287,6 @@ with tab1:
         df_live.insert(0, 'Miejsce', df_live.index)
         df_live["Pkt Turniejowe"] = df_live["Miejsce"].apply(get_tournament_points)
         
-        # Kolorowanie tabeli na żywo (odcienie zieleni)
         st.dataframe(df_live.style.background_gradient(cmap="Greens", subset=["Suma"]), use_container_width=True, hide_index=True)
         
         if st.button("💾 ZAPISZ OFICJALNE WYNIKI RUNDY"):
@@ -325,7 +340,6 @@ with tab1:
     df_gen.index += 1
     df_gen.insert(0, 'Poz.', df_gen.index)
     
-    # Podświetlenie kolumny SUMA na pastelowo-żółto, identycznie jak w Waszym Excelu
     st.dataframe(df_gen.style.set_properties(**{'background-color': '#FFF9C4'}, subset=['SUMA PUNKTÓW']), use_container_width=True, hide_index=True)
 
 # --- TAB 2: HISTORIA RUND (1-12) ---
