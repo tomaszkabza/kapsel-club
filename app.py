@@ -8,12 +8,12 @@ from io import BytesIO
 # Konfiguracja strony pod smartfona
 st.set_page_config(page_title="Kapsel Club Browar", layout="centered")
 
-# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE (POPRAWIONA) ---
+# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE ---
 st.markdown("""
     <style>
     /* Zdjęcie jako tło całej strony */
     .stApp {
-        background-image: url("https://raw.githubusercontent.com/tomaszkabza/kapsel-club/main/tlo.png");
+        background-image: url("https://raw.githubusercontent.com/tomaszkabza/kapsel-club/main/tlo.jpg");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
@@ -32,7 +32,7 @@ st.markdown("""
     /* Główne nagłówki - Klubowa Zieleń */
     h1, h2, h3 { color: #1B5E20 !important; font-family: 'Segoe UI', sans-serif; font-weight: bold; }
     
-    /* Przyciski (np. Dodaj do listy, Zapisz) - Zielone z białym tekstem */
+    /* Przyciski (np. Zapisz) - Zielone z białym tekstem */
     .stButton>button { 
         background-color: #1B5E20; 
         color: #FFFFFF; 
@@ -77,14 +77,15 @@ st.subheader("Oficjalny Panel Live • Puchar Lata 2026")
 # Nazwa oficjalnego pliku bazowego w repozytorium
 EXCEL_FILE = "Puchar_Lata_2026_Browar.xlsx"
 
-# Inicjalizacja bazy i historii rund 1 i 2 (stan faktyczny z Excela)
+# Inicjalizacja oficjalnej bazy (dodani zawodnicy: HAL, TAS, KAL, JAN z zerami za R1 i R2)
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
-    st.session_state.players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR']
+    st.session_state.players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN']
     st.session_state.history = {
         "DAN": [20, 20], "RDX": [18, 14], "SIW": [12, 16], "BĄB": [14, 12],
         "JAC": [16, 9],  "KRO": [0, 18],  "PAW": [7, 10],  "PYR": [9, 6],
-        "SZP": [10, 3],  "DOM": [8, 0],   "CYG": [0, 8],   "DAR": [0, 7]
+        "SZP": [10, 3],  "DOM": [8, 0],   "CYG": [0, 8],   "DAR": [0, 7],
+        "HAL": [0, 0],   "TAS": [0, 0],   "KAL": [0, 0],   "JAN": [0, 0]
     }
     st.session_state.heats_archive = {
         1: pd.DataFrame({
@@ -108,9 +109,8 @@ def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
     return pts_map.get(rank, 0)
 
-# FUNKCJA: Całkowicie odporne na błędy kolorowanie tabel
+# FUNKCJA: Całkowicie odporne na błędy kolorowanie tabel bez zer po przecinku
 def style_matrix_like_excel(df):
-    # KROK 1: Przekształcamy całą tabelę na tekst i ręcznie usuwamy zera po przecinku
     df_text = df.copy()
     for col in df_text.columns:
         if col != "Bieg":
@@ -119,12 +119,11 @@ def style_matrix_like_excel(df):
                 label = str(df_text.loc[idx, "Bieg"])
                 val = row[col]
                 if label == "Średnia na bieg":
-                    new_vals.append(f"{float(val):.1f}") # jedno miejsce po przecinku
+                    new_vals.append(f"{float(val):.1f}")
                 else:
-                    new_vals.append(f"{int(float(val))}") # czysta pełna cyfra
+                    new_vals.append(f"{int(float(val))}")
             df_text[col] = new_vals
 
-    # KROK 2: Nakładamy kolory na czysty tekst
     def get_row_styles(row):
         styles = []
         row_label = str(row["Bieg"])
@@ -243,7 +242,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
             
     target_col = 3 + nr_rundy 
     
-    for r in range(new_gen_header + 1, new_gen_header + 25):
+    for r in range(new_gen_header + 1, new_gen_header + 30):
         z_name = ws.cell(row=r, column=3).value
         if z_name:
             z_name = str(z_name).strip()
@@ -264,21 +263,6 @@ tab1, tab2 = st.tabs(["🏠 STRONA GŁÓWNA (LIVE & GENERALNA)", "📚 HISTORIA 
 with tab1:
     st.header("⚡ Aktualna Runda na Żywo")
     
-    st.write("### ➕ Dopisz nowego zawodnika z palca:")
-    quick_col1, quick_col2 = st.columns([2, 1])
-    with quick_col1:
-        new_p_name = st.text_input("Inicjały nowego (np. TOM):").upper().strip()
-    with quick_col2:
-        st.write("##") 
-        if st.button("Dodaj do listy"):
-            if new_p_name and new_p_name not in st.session_state.players:
-                st.session_state.players.append(new_p_name)
-                ile_rund = len(list(st.session_state.history.values())[0])
-                st.session_state.history[new_p_name] = [0] * ile_rund
-                st.success(f"Dodano {new_p_name}!")
-                st.rerun()
-
-    st.write("---")
     obecna_ilosc_rund = len(list(st.session_state.history.values())[0])
     nr_rundy = st.number_input("Numer rozgrywanej rundy", min_value=1, max_value=12, value=obecna_ilosc_rund + 1)
     data_dzisiejsza = st.text_input("Data dzisiejszych zawodów:", value="24.07.2026")
@@ -381,7 +365,7 @@ with tab1:
         total_suma = sum(rounds)
         row_dict = {"Zawodnik": p}
         for r_idx, r_pts in enumerate(rounds):
-            if r_pts == 0 and p in ['KRO','CYG','DAR','DOM'] and r_idx < 2:
+            if r_pts == 0 and p in ['KRO','CYG','DAR','DOM','HAL','TAS','KAL','JAN'] and r_idx < 2:
                 row_dict[f"R{r_idx+1}"] = "-"
             elif r_pts == 0 and r_idx >= 2:
                 row_dict[f"R{r_idx+1}"] = "-"
