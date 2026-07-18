@@ -2,9 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
-import io
 
 # Konfiguracja strony pod smartfona
 st.set_page_config(page_title="Kapsel Club Browar", layout="centered")
@@ -21,83 +18,104 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🏆 Kapsel Club Browar")
-st.subheader("Oficjalny Panel • Puchar Lata 2026")
+st.subheader("Oficjalny Panel Live • Puchar Lata 2026")
 
-EXCEL_FILE = "Puchar_Lata_2026_Browar.xlsx"
-
-def znajdz_wiersz_po_tekscie(ws, tekst):
-    for r in range(1, ws.max_row + 1):
-        val = ws.cell(row=r, column=2).value
-        if val and tekst in str(val):
-            return r
-    return None
-
-# Ładowanie danych z pliku Excel
-@st.cache_data(ttl=10)
-def wczytaj_baze_graczy():
+# FUNKCJA: Inteligentne wczytywanie bazy z pliku Excel (szukanie nagłówka w pionie)
+def load_data_from_excel(filename="Puchar_Lata_2026_Browar_Korekta_R1.xlsx"):
     try:
-        wb = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
+        wb = openpyxl.load_workbook(filename, data_only=True)
         ws = wb["Puchar Lata 2026"]
-        idx_gen = znajdz_wiersz_po_tekscie(ws, "KLASYFIKACJA GENERALNA")
         
-        gracze = []
-        historia = {}
-        wiersz_nag = idx_gen + 1 if idx_gen else 30
+        # Szukamy wiersza z Klasyfikacją Generalną w Kolumnie B
+        gen_row_idx = None
+        for row in range(1, 200):
+            val = ws.cell(row=row, column=2).value
+            if val and "KLASYFIKACJA GENERALNA" in str(val):
+                gen_row_idx = row
+                break
         
-        for r in range(wiersz_nag + 1, wiersz_nag + 16):
-            zawodnik = ws.cell(row=r, column=3).value
-            if zawodnik and str(zawodnik).strip() != "":
-                n_gracza = str(zawodnik).strip()
-                gracze.append(n_gracza)
-                
-                # Odczyt historycznych punktów z pierwszych rund
-                r1_val = ws.cell(row=r, column=4).value
-                r2_val = ws.cell(row=r, column=5).value
-                
-                r1 = int(r1_val) if r1_val and str(r1_val) != "-" else 0
-                r2 = int(r2_val) if r2_val and str(r2_val) != "-" else 0
-                historia[n_gracza] = [r1, r2]
-                
-        return gracze, historia
-    except:
-        lista_awaryjna = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR']
-        historia_awaryjna = {g: [20, 20] if g=='DAN' else [0,0] for g in lista_awaryjna} # placeholder
-        return lista_awaryjna, historia_awaryjna
+        if not gen_row_idx:
+            # Awaryjny stan początkowy, jeśli plik byłby pusty
+            return ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR'], {}
 
-players_list, history_dict = wczytaj_baze_graczy()
+        # Czytamy zawodników i ich dotychczasowe punkty (zaczynamy 2 wiersze pod nagłówkiem)
+        players_list = []
+        history_dict = {}
+        
+        # Ustalamy ile rund już rozegrano na podstawie nagłówków (Kolumny D, E, F...)
+        header_row = gen_row_idx + 1
+        round_count = 0
+        for col in range(4, 16):
+            h_val = ws.cell(row=header_row, column=col).value
+            if h_val and str(h_val).startswith("R"):
+                round_count += 1
+        
+        # Wczytujemy wiersze zawodników
+        for r in range(header_row + 1, header_row + 20):
+            p_name = ws.cell(row=r, column=3).value
+            if p_name and str(p_name).strip() != "":
+                p_name = str(p_name).strip()
+                players_list.append(p_name)
+                
+                # Pobieramy punkty z rozegranych rund
+                p_rounds = []
+                for c in range(4, 4 + round_count):
+                    pts = ws.cell(row=r, column=c).value
+                    if pts is None or pts == "-":
+                        p_rounds.append(0)
+                    else:
+                        try:
+                            p_rounds.append(int(pts))
+                        except:
+                            p_rounds.append(0)
+                history_dict[p_name] = p_rounds
+                
+        return players_list, history_dict
+    except Exception as e:
+        # Awaryjny powrót w przypadku braku dostępu do pliku
+        return ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR'], {}
 
-if "players" not in st.session_state:
-    st.session_state.players = players_list
-    st.session_state.history = history_dict
+# Inicjalizacja bazy danych w pamięci sesji na podstawie Excela
+if "initialized" not in st.session_state:
+    st.session_state.players, st.session_state.history = load_data_from_excel()
+    if not st.session_state.history:
+        # Rezerwowy twardy zapis na wypadek pierwszego ładowania
+        st.session_state.history = {
+            "DAN": [20, 20], "RDX": [18, 14], "SIW": [12, 16], "BĄB": [14, 12],
+            "JAC": [16, 9],  "KRO": [0, 18],  "PAW": [7, 10],  "PYR": [9, 6],
+            "SZP": [10, 3],  "DOM": [8, 0],   "CYG": [0, 8],   "DAR": [0, 7]
+        }
+    st.session_state.initialized = True
 
 def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
     return pts_map.get(rank, 0)
 
-# --- NOWY UKŁAD GŁÓWNYCH ZAKŁADEK ---
-tab_glowna, tab_historia = st.tabs(["🏠 STRONA GŁÓWNA (LIVE & GENERALNA)", "📚 HISTORIA RUND (1-12)"])
+# Zakładki menu aplikacji
+tab1, tab2 = st.tabs(["🎮 RUNDA LIVE (PIĄTEK)", "📊 KLASYFIKACJA GENERALNA"])
 
-# ==========================================
-# 🏠 ZAKŁADKA GŁÓWNA: AKTUALNA RUNDA + GENERALNA
-# ==========================================
-with tab_glowna:
-    st.header("⚡ Aktualna Runda na Żywo")
+# --- TAB 1: RUNDA LIVE ---
+with tab1:
+    st.header("Zapisy i Wyniki Bieżącej Rundy")
     
-    st.write("### ➕ Dopisz nowego zawodnika z palca:")
+    st.write("### ➕ Ktoś przyszedł ekstra? Dopisz go:")
     quick_col1, quick_col2 = st.columns([2, 1])
     with quick_col1:
-        new_p_name = st.text_input("Inicjały nowego (np. TOM):").upper().strip()
+        new_p_name = st.text_input("Wpisz inicjały nowego (np. TOM):", key="quick_add_input").upper().strip()
     with quick_col2:
-        st.write("##")
+        st.write("##") 
         if st.button("Dodaj do listy"):
             if new_p_name and new_p_name not in st.session_state.players:
                 st.session_state.players.append(new_p_name)
-                st.session_state.history[new_p_name] = [0, 0]
+                ile_rund = len(list(st.session_state.history.values())[0]) if st.session_state.history else 2
+                st.session_state.history[new_p_name] = [0] * ile_rund
                 st.success(f"Dodano {new_p_name}!")
                 st.rerun()
 
     st.write("---")
-    nr_rundy = st.number_input("Numer rozgrywanej rundy", min_value=1, max_value=100, value=3)
+    # Automatycznie podpowiada kolejny numer rundy
+    obecna_ilosc_rund = len(list(st.session_state.history.values())[0]) if st.session_state.history else 2
+    nr_rundy = st.number_input("Numer rozgrywanej rundy", min_value=1, max_value=12, value=obecna_ilosc_rund + 1)
     
     st.write("**Zaznacz zawodników startujących dzisiaj:**")
     active_today = []
@@ -108,7 +126,9 @@ with tab_glowna:
                 active_today.append(p)
                 
     if len(active_today) > 0:
+        st.write("---")
         st.write("### Wpisz wyniki biegów (0 - 10):")
+        
         scores = {}
         for p in active_today:
             st.write(f"**Zawodnik: {p}**")
@@ -120,7 +140,9 @@ with tab_glowna:
                     p_scores.append(val)
             scores[p] = p_scores
             
-        st.write("### 📊 Wyniki Bieżącej Rundy na Żywo")
+        st.write("---")
+        st.write("### Wyniki Rundy na Żywo")
+        
         live_rows = []
         for p, b_vals in scores.items():
             suma = sum(b_vals)
@@ -135,140 +157,46 @@ with tab_glowna:
         
         st.dataframe(df_live, use_container_width=True)
         
-        if st.button("💾 GENERUJ UZUPEŁNIONY PLIK EXCEL"):
-            wb_mod = openpyxl.load_workbook(EXCEL_FILE)
-            ws_mod = wb_mod["Puchar Lata 2026"]
-            
-            start_r = 48 + ((nr_rundy - 3) * 12)
-            
-            CLUB_GREEN_DARK = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
-            CLUB_YELLOW_LIGHT = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
-            CLUB_GREEN_LIGHT = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
-            WHITE_FILL = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
-            GRAY_FILL = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
-            FONT_HEADER = Font(name="Segoe UI", size=10, bold=True, color="FFFFFF")
-            FONT_BODY_BLACK = Font(name="Segoe UI", size=10, color="000000")
-            FONT_BOLD_BLACK = Font(name="Segoe UI", size=10, bold=True, color="000000")
-            THIN_BORDER = Border(left=Side(style='thin', color='CCCCCC'), right=Side(style='thin', color='CCCCCC'), top=Side(style='thin', color='CCCCCC'), bottom=Side(style='thin', color='CCCCCC'))
-            
-            ws_mod.cell(row=start_r, column=2, value=f"Runda {nr_rundy} • Wyniki Live").font = Font(name="Segoe UI", size=11, bold=True)
-            
-            header_row = start_r + 1
-            ws_mod.cell(row=header_row, column=2, value="Bieg").font = FONT_HEADER
-            ws_mod.cell(row=header_row, column=2).fill = CLUB_GREEN_DARK
-            
-            for c_idx, p in enumerate(active_today, start=3):
-                cell = ws_mod.cell(row=header_row, column=c_idx, value=p)
-                cell.font = FONT_HEADER
-                cell.fill = CLUB_GREEN_DARK
-                cell.border = THIN_BORDER
-                
-            for b_idx in range(5):
-                curr_r = header_row + 1 + b_idx
-                is_zebra = (curr_r % 2 == 0)
-                f_col = CLUB_GREEN_LIGHT if is_zebra else WHITE_FILL
-                c_run = ws_mod.cell(row=curr_r, column=2, value=f"Bieg {b_idx+1}")
-                c_run.font = FONT_BOLD_BLACK
-                c_run.fill = f_col
-                c_run.border = THIN_BORDER
-                
-                for c_idx, p in enumerate(active_today, start=3):
-                    val = scores[p][b_idx]
-                    c_sc = ws_mod.cell(row=curr_r, column=c_idx, value=val)
-                    c_sc.font = FONT_BODY_BLACK
-                    c_sc.fill = f_col
-                    c_sc.border = THIN_BORDER
-                    
-            r_sum = header_row + 6
-            r_pts = header_row + 9
-            
-            ws_mod.cell(row=r_sum, column=2, value="Suma punktów").font = FONT_BOLD_BLACK
-            ws_mod.cell(row=r_sum, column=2).fill = CLUB_YELLOW_LIGHT
-            ws_mod.cell(row=r_pts, column=2, value="Punkty Turniejowe").font = FONT_BOLD_BLACK
-            ws_mod.cell(row=r_pts, column=2).fill = CLUB_YELLOW_LIGHT
-            
-            for c_idx, p in enumerate(active_today, start=3):
-                col_let = get_column_letter(c_idx)
-                ws_mod.cell(row=r_sum, column=c_idx, value=f"=SUM({col_let}{header_row+1}:{col_let}{header_row+5})").font = FONT_BOLD_BLACK
-                ws_mod.cell(row=r_sum, column=c_idx).fill = CLUB_YELLOW_LIGHT
-                ws_mod.cell(row=r_sum, column=c_idx).border = THIN_BORDER
-                
-                pt_live = int(df_live[df_live["Zawodnik"] == p]["Pkt Turniejowe"].values[0])
-                ws_mod.cell(row=r_pts, column=c_idx, value=pt_live).font = FONT_BOLD_BLACK
-                ws_mod.cell(row=r_pts, column=c_idx).fill = CLUB_YELLOW_LIGHT
-                ws_mod.cell(row=r_pts, column=c_idx).border = THIN_BORDER
+        # --- NOWOŚĆ: Szczegółowe zestawienie jak odbywały się biegi ---
+        st.write("### 🏁 Szczegółowy przebieg wyścigów w tej rundzie:")
+        heat_summary = []
+        for b in range(5):
+            sorted_players = sorted(scores.keys(), key=lambda x: scores[x][b], reverse=True)
+            row_data = {"Bieg": f"Bieg {b+1}"}
+            for pos, pl in enumerate(sorted_players[:6]):  # Pokazujemy TOP 6 w danym biegu
+                row_data[f"Miejsce {pos+1}"] = f"{pl} ({scores[pl][b]} pkt)"
+            heat_summary.append(row_data)
+        
+        df_heats = pd.DataFrame(heat_summary)
+        st.dataframe(df_heats, use_container_width=True)
+        
+        if st.button("💾 ZAPISZ OFICJALNE WYNIKI RUNDY"):
+            for p in st.session_state.players:
+                if p in df_live["Zawodnik"].values:
+                    wywalczone = int(df_live[df_live["Zawodnik"] == p]["Pkt Turniejowe"].values[0])
+                    st.session_state.history[p].append(wywalczone)
+                else:
+                    st.session_state.history[p].append(0)
+            st.success(f"Pomyślnie zapisano i zamknięto Rundę {nr_rundy}!")
+            st.rerun()
 
-            idx_gen_live = znajdz_wiersz_po_tekscie(ws_mod, "KLASYFIKACJA GENERALNA")
-            w_nag_live = idx_gen_live + 1 if idx_gen_live else 30
-            kolumna_rundy = 3 + nr_rundy
-            
-            for r in range(w_nag_live + 1, w_nag_live + 16):
-                z_name = ws_mod.cell(row=r, column=3).value
-                if z_name and str(z_name).strip() in df_live["Zawodnik"].values:
-                    p_name = str(z_name).strip()
-                    p_turniejowe = int(df_live[df_live["Zawodnik"] == p_name]["Pkt Turniejowe"].values[0])
-                    ws_mod.cell(row=r, column=kolumna_rundy, value=p_turniejowe)
-                elif z_name:
-                    ws_mod.cell(row=r, column=kolumna_rundy, value="-")
-
-            buffer = io.BytesIO()
-            wb_mod.save(buffer)
-            buffer.seek(0)
-            
-            st.success(f"🔥 Wygenerowano Excel dla Rundy {nr_rundy}!")
-            st.download_button(
-                label="📥 POBIERZ UZUPEŁNIONY PLIK EXCEL",
-                data=buffer,
-                file_name=f"Puchar_Lata_2026_Gotowy_R{nr_rundy}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-    st.write("---")
-    st.header("👑 Bieżąca Klasyfikacja Generalna Sezonu")
+# --- TAB 2: KLASYFIKACJA GENERALNA ---
+with tab2:
+    st.header("Oficjalna Klasyfikacja Generalna")
+    
     gen_rows = []
     for p, rounds in st.session_state.history.items():
         total_suma = sum(rounds)
-        row_dict = {"Zawodnik": p, "SUMA": total_suma}
+        row_dict = {"Zawodnik": p}
+        for r_idx, r_pts in enumerate(rounds):
+            row_dict[f"R{r_idx+1}"] = r_pts if r_pts > 0 or p in ['KRO','CYG','DAR','DOM'] else "-" 
+        row_dict["SUMA PUNKTÓW"] = total_suma
         gen_rows.append(row_dict)
         
     df_gen = pd.DataFrame(gen_rows)
-    df_gen = df_gen.sort_values(by="SUMA", ascending=False).reset_index(drop=True)
+    df_gen = df_gen.fillna("-")
+    df_gen = df_gen.sort_values(by="SUMA PUNKTÓW", ascending=False).reset_index(drop=True)
     df_gen.index += 1
     df_gen.insert(0, 'Poz.', df_gen.index)
-    st.dataframe(df_gen.style.set_properties(**{'background-color': '#FFF9C4'}, subset=['SUMA']), use_container_width=True)
-
-# ==========================================
-# 📚 ZAKŁADKA HISTORII: RUNDY 1 DO 12 (SUB-TABS)
-# ==========================================
-with tab_historia:
-    st.header("🗂️ Archiwum Rozegranych Rund")
-    st.write("Wybierz interesującą Cię rundę z zakładek poniżej, aby podejrzeć oficjalne punkty turniejowe:")
     
-    # Tworzymy 12 podzakładek wewnątrz historii
-    sub_tabs = st.tabs([f"Runda {i}" for i in range(1, 13)])
-    
-    for idx, s_tab in enumerate(sub_tabs, start=1):
-        with s_tab:
-            st.subheader(f"📋 Wyniki: Runda {idx}")
-            
-            hist_rows = []
-            for p, rounds in st.session_state.history.items():
-                # Sprawdzamy, czy mamy dane dla tej rundy w historii sesji
-                if idx <= len(rounds):
-                    punkty_z_rundy = rounds[idx-1]
-                    hist_rows.append({
-                        "Zawodnik": p, 
-                        "Zdobyte Punkty Turniejowe": punkty_z_rundy if punkty_z_rundy > 0 else "-"
-                    })
-                else:
-                    hist_rows.append({"Zawodnik": p, "Zdobyte Punkty Turniejowe": "-"})
-                    
-            df_hist = pd.DataFrame(hist_rows)
-            # Pokazujemy tylko tych, którzy faktycznie dostali punkty w danej rundzie, dla czytelności
-            df_hist_filtered = df_hist[df_hist["Zdobyte Punkty Turniejowe"] != "-"].sort_values(by="Zdobyte Punkty Turniejowe", ascending=False).reset_index(drop=True)
-            
-            if not df_hist_filtered.empty:
-                df_hist_filtered.index += 1
-                st.dataframe(df_hist_filtered, use_container_width=True)
-            else:
-                st.info(f"Runda {idx} nie została jeszcze rozegrana lub brak zapisanych danych.")
+    st.dataframe(df_gen.style.set_properties(**{'background-color': '#FFF9C4'}, subset=['SUMA PUNKTÓW']), use_container_width=True)
