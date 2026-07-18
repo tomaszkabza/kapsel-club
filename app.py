@@ -19,7 +19,7 @@ st.markdown("""
 st.title("🏆 Kapsel Club Browar")
 st.subheader("Oficjalny Panel Live • Puchar Lata 2026")
 
-# Inicjalizacja oficjalnych wyników
+# Inicjalizacja oficjalnych wyników (Stan faktyczny z Excela)
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
     st.session_state.players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR']
@@ -31,12 +31,11 @@ if "initialized" not in st.session_state:
         "SZP": [10, 3],  "DOM": [8, 0],   "CYG": [0, 8],   "DAR": [0, 7]
     }
     
-    # PEŁNE DANE ARCHIWALNE BIEGÓW (Odwzorowanie 1:1 z Excela)
+    # PEŁNE DANE ARCHIWALNE BIEGÓW (9 zawodników w R1, 10 zawodników w R2)
     st.session_state.heats_archive = {
         1: pd.DataFrame({
             "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
-            "JAC": [5, 4, 3, 2, 2], "DAR": [0, 0, 0, 0, 0], "CYG": [0, 0, 0, 0, 0],
-            "PAW": [2, 1, 2, 1, 1], "RDX": [8, 10, 8, 6, 7], "KRO": [0, 0, 0, 0, 0],
+            "JAC": [5, 4, 3, 2, 2], "PAW": [2, 1, 2, 1, 1], "RDX": [8, 10, 8, 6, 7], 
             "SIW": [4, 3, 4, 3, 4], "BĄB": [6, 7, 5, 4, 5], "SZP": [3, 2, 6, 5, 3],
             "PYR": [1, 5, 1, 7, 6], "DAN": [10, 8, 10, 10, 10], "DOM": [7, 6, 7, 0, 0]
         }),
@@ -115,7 +114,6 @@ with tab1:
         df_live.insert(0, 'Miejsce', df_live.index)
         df_live["Pkt Turniejowe"] = df_live["Miejsce"].apply(get_tournament_points)
         
-        # Wyświetlanie czystej tabeli bez indeksów
         st.dataframe(df_live, use_container_width=True, hide_index=True)
         
         if st.button("💾 ZAPISZ OFICJALNE WYNIKI RUNDY"):
@@ -126,7 +124,7 @@ with tab1:
                 else:
                     st.session_state.history[p].append(0)
             
-            # Zapis pełnej macierzy do archiwum
+            # Zapis do archiwum
             live_matrix = {"Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"]}
             for p in active_today:
                 live_matrix[p] = scores[p]
@@ -168,37 +166,35 @@ with tab2:
     if wybrana_runda in st.session_state.heats_archive:
         st.write(f"### 🏁 Pełna tabela punktowa – Runda {wybrana_runda}")
         
-        # Pobieramy bazową tabelę biegów
         df_arch = st.session_state.heats_archive[wybrana_runda].copy()
-        
-        # Dynamicznie wyliczamy podsumowanie dokładnie tak jak w Excelu!
         player_cols = [c for c in df_arch.columns if c != "Bieg"]
+        
+        # dynamiczne sortowanie kolumn od najlepszego zawodnika w danej rundzie
+        sorted_cols_by_sum = sorted(player_cols, key=lambda p: df_arch[p].sum(), reverse=True)
+        df_arch = df_arch[["Bieg"] + sorted_cols_by_sum]
         
         sums = ["Suma punktów"]
         averages = ["Średnia na bieg"]
         ranks = ["Miejsce"]
         t_points = ["Punkty Turniejowe"]
         
-        # Wyliczenia dla każdego gracza
         player_totals = {}
-        for p in player_cols:
+        for p in sorted_cols_by_sum:
             s_val = df_arch[p].sum()
             player_totals[p] = s_val
             sums.append(s_val)
             averages.append(round(df_arch[p].mean(), 1))
             
-        # Wyliczenie miejsc (od najwyższej sumy)
         sorted_players_by_sum = sorted(player_totals.items(), key=lambda x: x[1], reverse=True)
         player_ranks = {}
         for rank_idx, (p, _) in enumerate(sorted_players_by_sum):
             player_ranks[p] = rank_idx + 1
             
-        for p in player_cols:
+        for p in sorted_cols_by_sum:
             rk = player_ranks[p]
             ranks.append(rk)
             t_points.append(get_tournament_points(rk))
             
-        # Dołączamy wiersze podsumowujące na dół tabeli
         df_extra = pd.DataFrame(columns=df_arch.columns)
         df_extra.loc[len(df_extra)] = sums
         df_extra.loc[len(df_extra)] = averages
@@ -207,5 +203,4 @@ with tab2:
         
         df_full_display = pd.concat([df_arch, df_extra], ignore_index=True)
         
-        # Wyświetlamy kompletną, niepoobcinaną tabelę bez szarych indeksów
         st.dataframe(df_full_display, use_container_width=True, hide_index=True)
