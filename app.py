@@ -108,26 +108,44 @@ def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
     return pts_map.get(rank, 0)
 
-# FUNKCJA: Nakładanie kolorów identycznych z Excelem na tabele w aplikacji
+# FUNKCJA: Nakładanie kolorów i POPRAWNEGO FORMATOWANIA LICZB (bez zbędnych zer)
 def style_matrix_like_excel(df):
+    # Tworzymy słownik formatowania dla każdej kolumny zawodnika
+    format_dict = {}
+    for col in df.columns:
+        if col != "Bieg":
+            # Ta funkcja sprawdza każdy wiersz w danej kolumnie i decyduje o liczbie miejsc po przecinku
+            format_dict[col] = lambda val, df=df: f"{val:.1f}" if str(df.loc[df[df.columns[df.columns.get_loc(col)]] == val, "Bieg"].values).find("Średnia") != -1 else f"{int(float(val))}"
+            
+    # Ponieważ dynamiczne formatowanie lambda na wierszach w st.dataframe bywa kapryśne, 
+    # najbezpieczniejszym sposobem na usunięcie .000000 przy zachowaniu kolorowania jest tekstowe przygotowanie wartości w komórkach:
+    df_clean = df.copy()
+    for col in df_clean.columns:
+        if col != "Bieg":
+            for idx, row in df_clean.iterrows():
+                val = row[col]
+                if df_clean.loc[idx, "Bieg"] == "Średnia na bieg":
+                    df_clean.loc[idx, col] = f"{float(val):.1f}"
+                else:
+                    df_clean.loc[idx, col] = f"{int(float(val))}"
+
     def get_row_styles(row):
         styles = []
         row_label = str(row["Bieg"])
-        
-        for col in df.columns:
+        for col in df_clean.columns:
             if row_label in ["Bieg 1", "Bieg 3", "Bieg 5"]:
-                styles.append("background-color: #FFFFFF; color: #000000;")
+                styles.append("background-color: #FFFFFF; color: #000000; text-align: center;")
             elif row_label in ["Bieg 2", "Bieg 4"]:
-                styles.append("background-color: #E8F5E9; color: #000000;") # pastelowa mięta
+                styles.append("background-color: #E8F5E9; color: #000000; text-align: center;")
             elif row_label in ["Suma punktów", "Średnia na bieg", "Punkty Turniejowe"]:
-                styles.append("background-color: #FFF9C4; color: #000000; font-weight: bold;") # pastelowy żółty
+                styles.append("background-color: #FFF9C4; color: #000000; font-weight: bold; text-align: center;")
             elif row_label == "Miejsce":
-                styles.append("background-color: #F5F5F5; color: #000000; font-weight: bold;") # jasnoszary
+                styles.append("background-color: #F5F5F5; color: #000000; font-weight: bold; text-align: center;")
             else:
-                styles.append("background-color: #FFFFFF; color: #000000;")
+                styles.append("background-color: #FFFFFF; color: #000000; text-align: center;")
         return styles
 
-    return df.style.apply(get_row_styles, axis=1)
+    return df_clean.style.apply(get_row_styles, axis=1)
 
 def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsza):
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
@@ -307,22 +325,20 @@ with tab1:
         df_live.insert(0, 'Miejsce', df_live.index)
         df_live["Pkt Turniejowe"] = df_live["Miejsce"].apply(get_tournament_points)
         
-        st.dataframe(df_live.style.background_gradient(cmap="Greens", subset=["Suma"]), use_container_width=True, hide_index=True)
+        st.dataframe(df_live, use_container_width=True, hide_index=True)
         
-        # --- NOWOŚĆ: Podgląd bieżącej macierzy biegów sformatowany jak Excel ---
         st.write("### 🏁 Podgląd Tabeli Biegowej Rundy:")
         live_matrix = {"Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"]}
         for p in list(df_live["Zawodnik"].values):
             live_matrix[p] = scores[p]
         df_live_mat = pd.DataFrame(live_matrix)
         
-        # Przygotowanie wierszy podsumowania na żywo
         sums_l = ["Suma punktów"]; avg_l = ["Średnia na bieg"]; rk_l = ["Miejsce"]; pt_l = ["Punkty Turniejowe"]
         for p in list(df_live["Zawodnik"].values):
-            sums_l.append(int(df_live[df_live["Zawodnik"] == p]["Suma"].values[0]))
-            avg_l.append(float(df_live[df_live["Zawodnik"] == p]["Średnia"].values[0]))
-            rk_l.append(int(df_live[df_live["Zawodnik"] == p]["Miejsce"].values[0]))
-            pt_l.append(int(df_live[df_live["Zawodnik"] == p]["Pkt Turniejowe"].values[0]))
+            sums_l.append(df_live[df_live["Zawodnik"] == p]["Suma"].values[0])
+            avg_l.append(df_live[df_live["Zawodnik"] == p]["Średnia"].values[0])
+            rk_l.append(df_live[df_live["Zawodnik"] == p]["Miejsce"].values[0])
+            pt_l.append(df_live[df_live["Zawodnik"] == p]["Pkt Turniejowe"].values[0])
             
         df_live_extra = pd.DataFrame(columns=df_live_mat.columns)
         df_live_extra.loc[len(df_live_extra)] = sums_l
@@ -356,7 +372,6 @@ with tab1:
             file_name=f"Puchar_Lata_2026_Kapsel_Club_Po_R{nr_rundy}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        st.info("Pobierz ten plik na telefon, a w domu wrzuć go na GitHuba jako nową bazę turnieju.")
 
     st.write("---")
     st.header("🏆 Oficjalna Klasyfikacja Generalna Pucharu")
@@ -425,6 +440,4 @@ with tab2:
         df_extra.loc[len(df_extra)] = t_points
         
         df_full_display = pd.concat([df_arch, df_extra], ignore_index=True)
-        
-        # Uruchomienie precyzyjnego kolorowania w archiwum
         st.dataframe(style_matrix_like_excel(df_full_display), use_container_width=True, hide_index=True)
