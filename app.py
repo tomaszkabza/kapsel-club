@@ -19,41 +19,40 @@ st.markdown("""
 st.title("🏆 Kapsel Club Browar")
 st.subheader("Oficjalny Panel Live • Puchar Lata 2026")
 
-# Inicjalizacja bazy i historii
+# Inicjalizacja oficjalnych wyników
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
     st.session_state.players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR']
     
-    # Oficjalne punkty turniejowe za R1 i R2
+    # Generalka (stan faktyczny)
     st.session_state.history = {
         "DAN": [20, 20], "RDX": [18, 14], "SIW": [12, 16], "BĄB": [14, 12],
         "JAC": [16, 9],  "KRO": [0, 18],  "PAW": [7, 10],  "PYR": [9, 6],
         "SZP": [10, 3],  "DOM": [8, 0],   "CYG": [0, 8],   "DAR": [0, 7]
     }
     
-    # BAZA HISTORII BIEGÓW (Dane szczegółowe wyścigów dla poprzednich rund)
+    # PEŁNE DANE ARCHIWALNE BIEGÓW (Odwzorowanie 1:1 z Excela)
     st.session_state.heats_archive = {
-        1: [
-            {"Bieg": "Bieg 1", "1. Miejsce": "DAN", "2. Miejsce": "JAC", "3. Miejsce": "BĄB", "4. Miejsce": "SIW"},
-            {"Bieg": "Bieg 2", "1. Miejsce": "RDX", "2. Miejsce": "DAN", "3. Miejsce": "SZP", "4. Miejsce": "JAC"},
-            {"Bieg": "Bieg 3", "1. Miejsce": "DAN", "2. Miejsce": "RDX", "3. Miejsce": "BĄB", "4. Miejsce": "DOM"},
-            {"Bieg": "Bieg 4", "1. Miejsce": "JAC", "2. Miejsce": "SIW", "3. Miejsce": "DAN", "4. Miejsce": "PAW"},
-            {"Bieg": "Bieg 5", "1. Miejsce": "DAN", "2. Miejsce": "RDX", "3. Miejsce": "SIW", "4. Miejsce": "BĄB"},
-        ],
-        2: [
-            {"Bieg": "Bieg 1", "1. Miejsce": "KRO", "2. Miejsce": "SIW", "3. Miejsce": "DAN", "4. Miejsce": "RDX"},
-            {"Bieg": "Bieg 2", "1. Miejsce": "DAN", "2. Miejsce": "KRO", "3. Miejsce": "RDX", "4. Miejsce": "PAW"},
-            {"Bieg": "Bieg 3", "1. Miejsce": "SIW", "2. Miejsce": "DAN", "3. Miejsce": "BĄB", "4. Miejsce": "JAC"},
-            {"Bieg": "Bieg 4", "1. Miejsce": "KRO", "2. Miejsce": "RDX", "3. Miejsce": "SIW", "4. Miejsce": "CYG"},
-            {"Bieg": "Bieg 5", "1. Miejsce": "DAN", "2. Miejsce": "KRO", "3. Miejsce": "BĄB", "4. Miejsce": "PAW"},
-        ]
+        1: pd.DataFrame({
+            "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
+            "JAC": [5, 4, 3, 2, 2], "DAR": [0, 0, 0, 0, 0], "CYG": [0, 0, 0, 0, 0],
+            "PAW": [2, 1, 2, 1, 1], "RDX": [8, 10, 8, 6, 7], "KRO": [0, 0, 0, 0, 0],
+            "SIW": [4, 3, 4, 3, 4], "BĄB": [6, 7, 5, 4, 5], "SZP": [3, 2, 6, 5, 3],
+            "PYR": [1, 5, 1, 7, 6], "DAN": [10, 8, 10, 10, 10], "DOM": [7, 6, 7, 0, 0]
+        }),
+        2: pd.DataFrame({
+            "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
+            "JAC": [1, 1, 9, 10, 3], "DAR": [7, 5, 5, 3, 0], "CYG": [4, 4, 3, 9, 1],
+            "PAW": [6, 0, 6, 5, 8],  "RDX": [10, 7, 2, 0, 10], "KRO": [8, 8, 7, 8, 2],
+            "SIW": [3, 6, 10, 6, 6], "BĄB": [0, 10, 1, 7, 7], "SZP": [2, 2, 4, 1, 4],
+            "PYR": [5, 3, 0, 2, 5],  "DAN": [9, 9, 8, 4, 9]
+        })
     }
 
 def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
     return pts_map.get(rank, 0)
 
-# DOKŁADNIE TAKIE ZAKŁADKI JAK NA ZDJĘCIU
 tab1, tab2 = st.tabs(["🏠 STRONA GŁÓWNA (LIVE & GENERALNA)", "📚 HISTORIA RUND (1-12)"])
 
 # --- TAB 1: STRONA GŁÓWNA ---
@@ -116,23 +115,10 @@ with tab1:
         df_live.insert(0, 'Miejsce', df_live.index)
         df_live["Pkt Turniejowe"] = df_live["Miejsce"].apply(get_tournament_points)
         
-        st.dataframe(df_live, use_container_width=True)
-        
-        # Zestawienie biegów na żywo dla aktualnego piątku
-        st.write("### 🏁 Zestawienie biegów tej rundy (Na Żywo):")
-        heat_summary = []
-        for b in range(5):
-            sorted_players = sorted(scores.keys(), key=lambda x: scores[x][b], reverse=True)
-            row_data = {"Bieg": f"Bieg {b+1}"}
-            for pos, pl in enumerate(sorted_players[:6]):
-                row_data[f"{pos+1}. Miejsce"] = f"{pl} ({scores[pl][b]} pkt)"
-            heat_summary.append(row_data)
-        
-        df_heats = pd.DataFrame(heat_summary)
-        st.dataframe(df_heats, use_container_width=True)
+        # Wyświetlanie czystej tabeli bez indeksów
+        st.dataframe(df_live, use_container_width=True, hide_index=True)
         
         if st.button("💾 ZAPISZ OFICJALNE WYNIKI RUNDY"):
-            # Zapis punktów generalnych
             for p in st.session_state.players:
                 if p in df_live["Zawodnik"].values:
                     wywalczone = int(df_live[df_live["Zawodnik"] == p]["Pkt Turniejowe"].values[0])
@@ -140,8 +126,12 @@ with tab1:
                 else:
                     st.session_state.history[p].append(0)
             
-            # Zapis szczegółowego przebiegu biegów do archiwum
-            st.session_state.heats_archive[nr_rundy] = heat_summary
+            # Zapis pełnej macierzy do archiwum
+            live_matrix = {"Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"]}
+            for p in active_today:
+                live_matrix[p] = scores[p]
+            st.session_state.heats_archive[nr_rundy] = pd.DataFrame(live_matrix)
+            
             st.success(f"Pomyślnie zapisano i zamknięto Rundę {nr_rundy}!")
             st.rerun()
 
@@ -167,19 +157,55 @@ with tab1:
     df_gen.index += 1
     df_gen.insert(0, 'Poz.', df_gen.index)
     
-    st.dataframe(df_gen.style.set_properties(**{'background-color': '#FFF9C4'}, subset=['SUMA PUNKTÓW']), use_container_width=True)
+    st.dataframe(df_gen.style.set_properties(**{'background-color': '#FFF9C4'}, subset=['SUMA PUNKTÓW']), use_container_width=True, hide_index=True)
 
 # --- TAB 2: HISTORIA RUND (1-12) ---
 with tab2:
     st.header("📚 Archiwum Przebiegu Poszczególnych Rund")
-    st.write("Wybierz rundę, aby zobaczyć szczegółowe wyniki poszczególnych wyścigów:")
     
-    # Wybór rundy do podejrzenia historii
     wybrana_runda = st.selectbox("Wybierz numer rundy:", options=sorted(list(st.session_state.heats_archive.keys())), format_func=lambda x: f"Runda {x}")
     
     if wybrana_runda in st.session_state.heats_archive:
-        st.write(f"### 🏁 Przebieg biegów – Runda {wybrana_runda}")
-        df_arch_heats = pd.DataFrame(st.session_state.heats_archive[wybrana_runda])
-        st.dataframe(df_arch_heats, use_container_width=True)
-    else:
-        st.info("Brak szczegółowych danych dla tej rundy.")
+        st.write(f"### 🏁 Pełna tabela punktowa – Runda {wybrana_runda}")
+        
+        # Pobieramy bazową tabelę biegów
+        df_arch = st.session_state.heats_archive[wybrana_runda].copy()
+        
+        # Dynamicznie wyliczamy podsumowanie dokładnie tak jak w Excelu!
+        player_cols = [c for c in df_arch.columns if c != "Bieg"]
+        
+        sums = ["Suma punktów"]
+        averages = ["Średnia na bieg"]
+        ranks = ["Miejsce"]
+        t_points = ["Punkty Turniejowe"]
+        
+        # Wyliczenia dla każdego gracza
+        player_totals = {}
+        for p in player_cols:
+            s_val = df_arch[p].sum()
+            player_totals[p] = s_val
+            sums.append(s_val)
+            averages.append(round(df_arch[p].mean(), 1))
+            
+        # Wyliczenie miejsc (od najwyższej sumy)
+        sorted_players_by_sum = sorted(player_totals.items(), key=lambda x: x[1], reverse=True)
+        player_ranks = {}
+        for rank_idx, (p, _) in enumerate(sorted_players_by_sum):
+            player_ranks[p] = rank_idx + 1
+            
+        for p in player_cols:
+            rk = player_ranks[p]
+            ranks.append(rk)
+            t_points.append(get_tournament_points(rk))
+            
+        # Dołączamy wiersze podsumowujące na dół tabeli
+        df_extra = pd.DataFrame(columns=df_arch.columns)
+        df_extra.loc[len(df_extra)] = sums
+        df_extra.loc[len(df_extra)] = averages
+        df_extra.loc[len(df_extra)] = ranks
+        df_extra.loc[len(df_extra)] = t_points
+        
+        df_full_display = pd.concat([df_arch, df_extra], ignore_index=True)
+        
+        # Wyświetlamy kompletną, niepoobcinaną tabelę bez szarych indeksów
+        st.dataframe(df_full_display, use_container_width=True, hide_index=True)
