@@ -89,16 +89,16 @@ if "initialized" not in st.session_state:
     st.session_state.heats_archive = {
         1: pd.DataFrame({
             "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
-            "JAC": [5.0, 4.0, 3.0, 2.0, 2.0], "PAW": [2.0, 1.0, 2.0, 1.0, 1.0], "RDX": [8.0, 10.0, 8.0, 6.0, 7.0], 
-            "SIW": [4.0, 3.0, 4.0, 3.0, 4.0], "BĄB": [6.0, 7.0, 5.0, 4.0, 5.0], "SZP": [3.0, 2.0, 6.0, 5.0, 3.0],
-            "PYR": [1.0, 5.0, 1.0, 7.0, 6.0], "DAN": [10.0, 8.0, 10.0, 10.0, 10.0], "DOM": [7.0, 6.0, 7.0, 0.0, 0.0]
+            "JAC": [5, 4, 3, 2, 2], "PAW": [2, 1, 2, 1, 1], "RDX": [8, 10, 8, 6, 7], 
+            "SIW": [4, 3, 4, 3, 4], "BĄB": [6, 7, 5, 4, 5], "SZP": [3, 2, 6, 5, 3],
+            "PYR": [1, 5, 1, 7, 6], "DAN": [10, 8, 10, 10, 10], "DOM": [7, 6, 7, 0, 0]
         }),
         2: pd.DataFrame({
             "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
-            "JAC": [1.0, 1.0, 9.0, 10.0, 3.0], "DAR": [7.0, 5.0, 5.0, 3.0, 0.0], "CYG": [4.0, 4.0, 3.0, 9.0, 1.0],
-            "PAW": [6.0, 0.0, 6.0, 5.0, 8.0],  "RDX": [10.0, 7.0, 2.0, 0.0, 10.0], "KRO": [8.0, 8.0, 7.0, 8.0, 2.0],
-            "SIW": [3.0, 6.0, 10.0, 6.0, 6.0], "BĄB": [0.0, 10.0, 1.0, 7.0, 7.0], "SZP": [2.0, 2.0, 4.0, 1.0, 4.0],
-            "PYR": [5.0, 3.0, 0.0, 2.0, 5.0],  "DAN": [9.0, 9.0, 8.0, 4.0, 9.0]
+            "JAC": [1, 1, 9, 10, 3], "DAR": [7, 5, 5, 3, 0], "CYG": [4, 4, 3, 9, 1],
+            "PAW": [6, 0, 6, 5, 8],  "RDX": [10, 7, 2, 0, 10], "KRO": [8, 8, 7, 8, 2],
+            "SIW": [3, 6, 10, 6, 6], "BĄB": [0, 10, 1, 7, 7], "SZP": [2, 2, 4, 1, 4],
+            "PYR": [5, 3, 0, 2, 5],  "DAN": [9, 9, 8, 4, 9]
         })
     }
     st.session_state.excel_ready = False
@@ -108,12 +108,27 @@ def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
     return pts_map.get(rank, 0)
 
-# FUNKCJA: Bezpieczne formatowanie wyświetlania i kolorowanie w stylu Excela
+# FUNKCJA: Całkowicie odporne na błędy kolorowanie tabel
 def style_matrix_like_excel(df):
+    # KROK 1: Przekształcamy całą tabelę na tekst i ręcznie usuwamy zera po przecinku
+    df_text = df.copy()
+    for col in df_text.columns:
+        if col != "Bieg":
+            new_vals = []
+            for idx, row in df_text.iterrows():
+                label = str(df_text.loc[idx, "Bieg"])
+                val = row[col]
+                if label == "Średnia na bieg":
+                    new_vals.append(f"{float(val):.1f}") # jedno miejsce po przecinku
+                else:
+                    new_vals.append(f"{int(float(val))}") # czysta pełna cyfra
+            df_text[col] = new_vals
+
+    # KROK 2: Nakładamy kolory na czysty tekst
     def get_row_styles(row):
         styles = []
         row_label = str(row["Bieg"])
-        for col in df.columns:
+        for col in df_text.columns:
             if row_label in ["Bieg 1", "Bieg 3", "Bieg 5"]:
                 styles.append("background-color: #FFFFFF; color: #000000; text-align: center;")
             elif row_label in ["Bieg 2", "Bieg 4"]:
@@ -126,18 +141,7 @@ def style_matrix_like_excel(df):
                 styles.append("background-color: #FFFFFF; color: #000000; text-align: center;")
         return styles
 
-    # Tworzymy bezpieczną mapę formatowania dla widoku
-    format_rules = {}
-    for idx, row in df.iterrows():
-        row_label = str(row["Bieg"])
-        for col in df.columns:
-            if col != "Bieg":
-                if row_label == "Średnia na bieg":
-                    format_rules[(idx, df.columns.get_loc(col))] = "{:.1f}"
-                else:
-                    format_rules[(idx, df.columns.get_loc(col))] = "{:.0f}"
-
-    return df.style.apply(get_row_styles, axis=1).format(format_rules)
+    return df_text.style.apply(get_row_styles, axis=1)
 
 def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsza):
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
@@ -349,7 +353,6 @@ with tab1:
                 else:
                     st.session_state.history[p].append(0)
             
-            # Konwersja z powrotem do int przed archiwizacją
             live_matrix_int = {"Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"]}
             for p in active_today:
                 live_matrix_int[p] = scores[p]
@@ -408,7 +411,6 @@ with tab2:
         sorted_cols_by_sum = sorted(player_cols, key=lambda p: df_arch[p].sum(), reverse=True)
         df_arch = df_arch[["Bieg"] + sorted_cols_by_sum]
         
-        # Konwertujemy kolumny archiwalne na float, by formatowanie zadziałało bez błędów typu
         for col in sorted_cols_by_sum:
             df_arch[col] = df_arch[col].astype(float)
             
