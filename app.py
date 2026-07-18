@@ -8,12 +8,12 @@ from io import BytesIO
 # Konfiguracja strony pod smartfona
 st.set_page_config(page_title="Kapsel Club Browar", layout="centered")
 
-# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE ---
+# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE (POPRAWIONA) ---
 st.markdown("""
     <style>
     /* Zdjęcie jako tło całej strony */
     .stApp {
-        background-image: url("https://raw.githubusercontent.com/tomaszkabza/kapsel-club/main/tlo.jpg");
+        background-image: url("https://raw.githubusercontent.com/tomaszkabza/kapsel-club/main/tlo.png");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
