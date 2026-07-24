@@ -106,7 +106,7 @@ if "initialized" not in st.session_state:
 
 def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
-    return pts_map.get(rank, 0)
+    return pts_map.get(int(rank), 0) if pd.notnull(rank) else 0
 
 def style_matrix_like_excel(df):
     df_text = df.copy()
@@ -179,7 +179,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
     
     active_sorted = list(df_live_results["Zawodnik"].values)
     
-    # Bieg nagłówek
+    # Nagłówek nowej rundy
     ws.cell(row=start_r, column=2, value="Bieg").font = font_bold
     ws.cell(row=start_r, column=2).fill = fill_green
     ws.cell(row=start_r, column=2).font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
@@ -238,21 +238,27 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell = ws.cell(row=start_r, column=c_idx, value=int(df_live_results[df_live_results["Zawodnik"] == player]["Pkt Turniejowe"].values[0]))
         cell.font = font_bold; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
         
-    # Naprawiamy i przeliczamy wiersze SUMY I ŚREDNIEJ DLA WSZYSTKICH POPRZEDNICH RUND W PLIKU!
+    # POPRAWKA: Uzupełniamy Sumę, Średnią ORAZ Punkty Turniejowe we WSZYSTKICH starszych rundach (R1 i R2)!
     for r in range(1, start_r):
         v = ws.cell(row=r, column=2).value
         if v == "Suma punktów":
             for c in range(3, 20):
-                # Jeżeli w wyścigach 1-5 są cyfry, sumujemy je na sztywno
                 vals = [ws.cell(row=r-5+b, column=c).value for b in range(5)]
-                if all(isinstance(x, (int, float)) for x in vals if x is not None):
-                    valid_nums = [int(x) for x in vals if isinstance(x, (int, float))]
-                    if len(valid_nums) == 5:
-                        s_cell = ws.cell(row=r, column=c, value=sum(valid_nums))
-                        s_cell.font = font_bold; s_cell.fill = fill_yellow_light; s_cell.border = thin_border; s_cell.alignment = Alignment(horizontal="center")
-                        
-                        a_cell = ws.cell(row=r+1, column=c, value=round(sum(valid_nums)/5.0, 1))
-                        a_cell.font = font_normal; a_cell.fill = fill_yellow_light; a_cell.border = thin_border; a_cell.alignment = Alignment(horizontal="center")
+                valid_nums = [int(x) for x in vals if x is not None and isinstance(x, (int, float))]
+                if len(valid_nums) == 5:
+                    # Suma punktów w rundzie
+                    s_cell = ws.cell(row=r, column=c, value=sum(valid_nums))
+                    s_cell.font = font_bold; s_cell.fill = fill_yellow_light; s_cell.border = thin_border; s_cell.alignment = Alignment(horizontal="center")
+                    
+                    # Średnia
+                    a_cell = ws.cell(row=r+1, column=c, value=round(sum(valid_nums)/5.0, 1))
+                    a_cell.font = font_normal; a_cell.fill = fill_yellow_light; a_cell.border = thin_border; a_cell.alignment = Alignment(horizontal="center")
+                    
+                    # Punkty Turniejowe na podstawie Miejsca (r+2)
+                    m_val = ws.cell(row=r+2, column=c).value
+                    if m_val and isinstance(m_val, (int, float)):
+                        pt_cell = ws.cell(row=r+3, column=c, value=get_tournament_points(m_val))
+                        pt_cell.font = font_bold; pt_cell.fill = fill_yellow_light; pt_cell.border = thin_border; pt_cell.alignment = Alignment(horizontal="center")
 
     # 2. ODNOWIENIE I SORTOWANIE GENERALKI
     new_gen_header = None
