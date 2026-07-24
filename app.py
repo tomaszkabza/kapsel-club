@@ -238,7 +238,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell = ws.cell(row=start_r, column=c_idx, value=int(df_live_results[df_live_results["Zawodnik"] == player]["Pkt Turniejowe"].values[0]))
         cell.font = font_bold; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
         
-    # POPRAWKA: Uzupełniamy Sumę, Średnią ORAZ Punkty Turniejowe we WSZYSTKICH starszych rundach (R1 i R2)!
+    # Naprawiamy wiersze w starych rundach
     for r in range(1, start_r):
         v = ws.cell(row=r, column=2).value
         if v == "Suma punktów":
@@ -246,58 +246,72 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
                 vals = [ws.cell(row=r-5+b, column=c).value for b in range(5)]
                 valid_nums = [int(x) for x in vals if x is not None and isinstance(x, (int, float))]
                 if len(valid_nums) == 5:
-                    # Suma punktów w rundzie
                     s_cell = ws.cell(row=r, column=c, value=sum(valid_nums))
                     s_cell.font = font_bold; s_cell.fill = fill_yellow_light; s_cell.border = thin_border; s_cell.alignment = Alignment(horizontal="center")
                     
-                    # Średnia
                     a_cell = ws.cell(row=r+1, column=c, value=round(sum(valid_nums)/5.0, 1))
                     a_cell.font = font_normal; a_cell.fill = fill_yellow_light; a_cell.border = thin_border; a_cell.alignment = Alignment(horizontal="center")
                     
-                    # Punkty Turniejowe na podstawie Miejsca (r+2)
                     m_val = ws.cell(row=r+2, column=c).value
                     if m_val and isinstance(m_val, (int, float)):
                         pt_cell = ws.cell(row=r+3, column=c, value=get_tournament_points(m_val))
                         pt_cell.font = font_bold; pt_cell.fill = fill_yellow_light; pt_cell.border = thin_border; pt_cell.alignment = Alignment(horizontal="center")
 
-    # 2. ODNOWIENIE I SORTOWANIE GENERALKI
+    # 2. ODNOWIENIE, DOPISYWANIE BRAKUJĄCYCH ZAWODNIKÓW I SORTOWANIE GENERALKI
     new_gen_header = None
     for row in range(1, 350):
         val = ws.cell(row=row, column=2).value
         if val and "KLASYFIKACJA GENERALNA PUCHARU" in str(val):
             new_gen_header = row + 1
             break
-            
-    target_col = 3 + nr_rundy 
-    
-    for r in range(new_gen_header + 1, new_gen_header + 30):
-        z_name = ws.cell(row=r, column=3).value
-        if z_name:
-            z_name = str(z_name).strip()
-            if z_name in df_live_results["Zawodnik"].values:
-                pkt_zdobyte = int(df_live_results[df_live_results["Zawodnik"] == z_name]["Pkt Turniejowe"].values[0])
-                ws.cell(row=r, column=target_col, value=pkt_zdobyte).alignment = Alignment(horizontal="center")
-            else:
-                ws.cell(row=r, column=target_col, value="-").alignment = Alignment(horizontal="center")
 
-    rows_data = []
-    for r in range(new_gen_header + 1, new_gen_header + 30):
+    # Odczytujemy wszystkich graczy, którzy już są wpisani w Generałce
+    existing_players = {}
+    for r in range(new_gen_header + 1, new_gen_header + 40):
         z_name = ws.cell(row=r, column=3).value
         if z_name:
             z_name = str(z_name).strip()
-            r_vals = []
-            row_sum = 0
+            existing_players[z_name] = r
+
+    # Upewniamy się, że WSZYSTCY zawodnicy z bazy st.session_state.players są w tabeli
+    all_players_list = st.session_state.players
+    for p in all_players_list:
+        if p not in existing_players:
+            # Dopisujemy nowego gracza na końcu tabeli
+            next_row = new_gen_header + len(existing_players) + 1
+            ws.cell(row=next_row, column=3, value=p)
             for c in range(4, 16):
-                val = ws.cell(row=r, column=c).value
-                if val and isinstance(val, (int, float)):
-                    r_vals.append(int(val))
-                    row_sum += int(val)
-                else:
-                    r_vals.append("-")
-            rows_data.append({"zawodnik": z_name, "rundy": r_vals, "suma": row_sum})
+                ws.cell(row=next_row, column=c, value="-")
+            existing_players[p] = next_row
 
+    target_col = 3 + nr_rundy 
+
+    # Aktualizujemy dzisiejszą rundę dla każdego gracza w generałce
+    for p, r_row in existing_players.items():
+        if p in df_live_results["Zawodnik"].values:
+            pkt_zdobyte = int(df_live_results[df_live_results["Zawodnik"] == p]["Pkt Turniejowe"].values[0])
+            ws.cell(row=r_row, column=target_col, value=pkt_zdobyte).alignment = Alignment(horizontal="center")
+        else:
+            ws.cell(row=r_row, column=target_col, value="-").alignment = Alignment(horizontal="center")
+
+    # Pobieramy kompletne dane do posortowania
+    rows_data = []
+    for p, r_row in existing_players.items():
+        r_vals = []
+        row_sum = 0
+        for c in range(4, 16):
+            val = ws.cell(row=r_row, column=c).value
+            if val and isinstance(val, (int, float)):
+                r_vals.append(int(val))
+                row_sum += int(val)
+            else:
+                r_vals.append("-")
+        rows_data.append({"zawodnik": p, "rundy": r_vals, "suma": row_sum})
+
+    # Sortujemy wszystkich 16 graczy według sumy punktów malejąco
     rows_data_sorted = sorted(rows_data, key=lambda x: x["suma"], reverse=True)
 
+    # Wpisujemy posortowaną stawkę z powrotem do Excela
     for idx, item in enumerate(rows_data_sorted, start=1):
         curr_r = new_gen_header + idx
         cell_p = ws.cell(row=curr_r, column=2, value=idx)
