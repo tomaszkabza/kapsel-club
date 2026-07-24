@@ -77,7 +77,7 @@ st.subheader("Oficjalny Panel Live • Puchar Lata 2026")
 # Nazwa oficjalnego pliku bazowego w repozytorium
 EXCEL_FILE = "Puchar_Lata_2026_Browar.xlsx"
 
-# Inicjalizacja oficjalnej bazy (dodani zawodnicy: HAL, TAS, KAL, JAN z brakiem startu None)
+# Inicjalizacja oficjalnej bazy
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
     st.session_state.players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN']
@@ -109,7 +109,7 @@ def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
     return pts_map.get(rank, 0)
 
-# FUNKCJA: Całkowicie odporne na błędy kolorowanie tabel bez zer po przecinku
+# FUNKCJA: Odporne na błędy kolorowanie tabel
 def style_matrix_like_excel(df):
     df_text = df.copy()
     for col in df_text.columns:
@@ -146,6 +146,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
     ws = wb["Puchar Lata 2026"]
     
+    # 1. Odnajdujemy sekcję Klasyfikacji Generalnej
     gen_header_row = None
     for row in range(1, 300):
         val = ws.cell(row=row, column=2).value
@@ -156,6 +157,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
     if not gen_header_row:
         gen_header_row = 29
         
+    # Rozsuwamy miejsce na nową rundę tuż nad generalką
     ws.insert_rows(idx=gen_header_row - 1, amount=12)
     start_r = gen_header_row - 1
     
@@ -180,6 +182,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
     
     active_sorted = list(df_live_results["Zawodnik"].values)
     
+    # Nagłówek nowej rundy
     ws.cell(row=start_r, column=2, value="Bieg").font = font_bold
     ws.cell(row=start_r, column=2).fill = fill_green
     ws.cell(row=start_r, column=2).font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
@@ -194,6 +197,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.border = thin_border
     start_r += 1
     
+    # Bieg 1-5
     for b in range(5):
         ws.cell(row=start_r, column=2, value=f"Bieg {b+1}").font = font_bold
         ws.cell(row=start_r, column=2).border = thin_border
@@ -206,6 +210,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
             cell.alignment = Alignment(horizontal="center")
         start_r += 1
         
+    # Suma punktów w rundzie
     cell_lbl1 = ws.cell(row=start_r, column=2, value="Suma punktów")
     cell_lbl1.font = font_bold; cell_lbl1.fill = fill_yellow_light; cell_lbl1.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
@@ -213,6 +218,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.font = font_bold; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
     start_r += 1
     
+    # Średnia
     cell_lbl2 = ws.cell(row=start_r, column=2, value="Średnia na bieg")
     cell_lbl2.font = font_bold; cell_lbl2.fill = fill_yellow_light; cell_lbl2.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
@@ -220,6 +226,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.font = font_normal; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
     start_r += 1
     
+    # Miejsce
     cell_lbl3 = ws.cell(row=start_r, column=2, value="Miejsce")
     cell_lbl3.font = font_bold; cell_lbl3.fill = fill_gray_light; cell_lbl3.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
@@ -227,13 +234,14 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.font = font_normal; cell.fill = fill_gray_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
     start_r += 1
     
+    # Punkty Turniejowe
     cell_lbl4 = ws.cell(row=start_r, column=2, value="Punkty Turniejowe")
     cell_lbl4.font = font_bold; cell_lbl4.fill = fill_yellow_light; cell_lbl4.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
         cell = ws.cell(row=start_r, column=c_idx, value=int(df_live_results[df_live_results["Zawodnik"] == player]["Pkt Turniejowe"].values[0]))
         cell.font = font_bold; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
         
-    # Odnalezienie przesuniętego wiersza nagłówka Klasyfikacji Generalnej
+    # 2. ODNOWIENIE I SORTOWANIE TABELI GENERALNEJ
     new_gen_header = None
     for row in range(1, 350):
         val = ws.cell(row=row, column=2).value
@@ -243,7 +251,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
             
     target_col = 3 + nr_rundy 
     
-    # 1. Wpisujemy zdobycze z nowo rozegranej rundy
+    # Wpisujemy wyniki dzisiejszej rundy
     for r in range(new_gen_header + 1, new_gen_header + 30):
         z_name = ws.cell(row=r, column=3).value
         if z_name:
@@ -253,33 +261,45 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
                 ws.cell(row=r, column=target_col, value=pkt_zdobyte).alignment = Alignment(horizontal="center")
             else:
                 ws.cell(row=r, column=target_col, value="-").alignment = Alignment(horizontal="center")
-                
-            # 2. Przeliczamy i wpisujemy twardą sumę punktów do kolumny SUMA (P = 16)
-            total_sum = 0
-            for col_idx in range(4, 4 + 12): # Od D do O
-                v = ws.cell(row=r, column=col_idx).value
-                if v and isinstance(v, (int, float)):
-                    total_sum += int(v)
-            
-            sum_cell = ws.cell(row=r, column=16, value=total_sum)
-            sum_cell.font = font_bold
-            sum_cell.alignment = Alignment(horizontal="center")
 
-    # 3. Przeliczamy i wpisujemy czystą pozycję Poz. (1, 2, 3...)
-    gen_data = []
+    # Pobieramy pełne wiersze z danymi do posortowania
+    rows_data = []
     for r in range(new_gen_header + 1, new_gen_header + 30):
         z_name = ws.cell(row=r, column=3).value
         if z_name:
-            tot = ws.cell(row=r, column=16).value or 0
-            gen_data.append((r, int(tot)))
-            
-    gen_data_sorted = sorted(gen_data, key=lambda x: x[1], reverse=True)
-    
-    for rank_idx, (r_row, _) in enumerate(gen_data_sorted, start=1):
-        poz_cell = ws.cell(row=r_row, column=2, value=rank_idx)
-        poz_cell.font = font_bold
-        poz_cell.alignment = Alignment(horizontal="center")
-                
+            z_name = str(z_name).strip()
+            # Czytamy punkty z rund 1 do 12 (kolumny 4-15)
+            r_vals = []
+            row_sum = 0
+            for c in range(4, 16):
+                val = ws.cell(row=r, column=c).value
+                if val and isinstance(val, (int, float)):
+                    r_vals.append(int(val))
+                    row_sum += int(val)
+                else:
+                    r_vals.append("-")
+            rows_data.append({"zawodnik": z_name, "rundy": r_vals, "suma": row_sum})
+
+    # SORTOWANIE GENERALKI OD LIDEAR DO OSTATNIEGO
+    rows_data_sorted = sorted(rows_data, key=lambda x: x["suma"], reverse=True)
+
+    # Wpisujemy posortowanych zawodników z powrotem do Excela
+    for idx, item in enumerate(rows_data_sorted, start=1):
+        curr_r = new_gen_header + idx
+        # Poz.
+        cell_p = ws.cell(row=curr_r, column=2, value=idx)
+        cell_p.font = font_bold; cell_p.alignment = Alignment(horizontal="center")
+        # Zawodnik
+        cell_z = ws.cell(row=curr_r, column=3, value=item["zawodnik"])
+        cell_z.font = font_bold; cell_z.alignment = Alignment(horizontal="center")
+        # R1 - R12
+        for r_i, r_val in enumerate(item["rundy"]):
+            cell_rv = ws.cell(row=curr_r, column=4 + r_i, value=r_val)
+            cell_rv.alignment = Alignment(horizontal="center")
+        # SUMA
+        cell_s = ws.cell(row=curr_r, column=16, value=item["suma"])
+        cell_s.font = font_bold; cell_s.alignment = Alignment(horizontal="center")
+
     out = BytesIO()
     wb.save(out)
     out.seek(0)
