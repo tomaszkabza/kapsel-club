@@ -77,15 +77,15 @@ st.subheader("Oficjalny Panel Live • Puchar Lata 2026")
 # Nazwa oficjalnego pliku bazowego w repozytorium
 EXCEL_FILE = "Puchar_Lata_2026_Browar.xlsx"
 
-# Inicjalizacja oficjalnej bazy (dodani zawodnicy: HAL, TAS, KAL, JAN z zerami za R1 i R2)
+# Inicjalizacja oficjalnej bazy (dodani zawodnicy: HAL, TAS, KAL, JAN z brakiem startu None)
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
     st.session_state.players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN']
     st.session_state.history = {
         "DAN": [20, 20], "RDX": [18, 14], "SIW": [12, 16], "BĄB": [14, 12],
-        "JAC": [16, 9],  "KRO": [0, 18],  "PAW": [7, 10],  "PYR": [9, 6],
-        "SZP": [10, 3],  "DOM": [8, 0],   "CYG": [0, 8],   "DAR": [0, 7],
-        "HAL": [0, 0],   "TAS": [0, 0],   "KAL": [0, 0],   "JAN": [0, 0]
+        "JAC": [16, 9],  "KRO": [None, 18], "PAW": [7, 10], "PYR": [9, 6],
+        "SZP": [10, 3],  "DOM": [8, None],  "CYG": [None, 8], "DAR": [None, 7],
+        "HAL": [None, None], "TAS": [None, None], "KAL": [None, None], "JAN": [None, None]
     }
     st.session_state.heats_archive = {
         1: pd.DataFrame({
@@ -233,6 +233,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell = ws.cell(row=start_r, column=c_idx, value=int(df_live_results[df_live_results["Zawodnik"] == player]["Pkt Turniejowe"].values[0]))
         cell.font = font_bold; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
         
+    # Odnalezienie przesuniętego wiersza nagłówka Klasyfikacji Generalnej
     new_gen_header = None
     for row in range(1, 350):
         val = ws.cell(row=row, column=2).value
@@ -242,6 +243,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
             
     target_col = 3 + nr_rundy 
     
+    # 1. Wpisujemy zdobycze z nowo rozegranej rundy
     for r in range(new_gen_header + 1, new_gen_header + 30):
         z_name = ws.cell(row=r, column=3).value
         if z_name:
@@ -251,6 +253,32 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
                 ws.cell(row=r, column=target_col, value=pkt_zdobyte).alignment = Alignment(horizontal="center")
             else:
                 ws.cell(row=r, column=target_col, value="-").alignment = Alignment(horizontal="center")
+                
+            # 2. Przeliczamy i wpisujemy twardą sumę punktów do kolumny SUMA (P = 16)
+            total_sum = 0
+            for col_idx in range(4, 4 + 12): # Od D do O
+                v = ws.cell(row=r, column=col_idx).value
+                if v and isinstance(v, (int, float)):
+                    total_sum += int(v)
+            
+            sum_cell = ws.cell(row=r, column=16, value=total_sum)
+            sum_cell.font = font_bold
+            sum_cell.alignment = Alignment(horizontal="center")
+
+    # 3. Przeliczamy i wpisujemy czystą pozycję Poz. (1, 2, 3...)
+    gen_data = []
+    for r in range(new_gen_header + 1, new_gen_header + 30):
+        z_name = ws.cell(row=r, column=3).value
+        if z_name:
+            tot = ws.cell(row=r, column=16).value or 0
+            gen_data.append((r, int(tot)))
+            
+    gen_data_sorted = sorted(gen_data, key=lambda x: x[1], reverse=True)
+    
+    for rank_idx, (r_row, _) in enumerate(gen_data_sorted, start=1):
+        poz_cell = ws.cell(row=r_row, column=2, value=rank_idx)
+        poz_cell.font = font_bold
+        poz_cell.alignment = Alignment(horizontal="center")
                 
     out = BytesIO()
     wb.save(out)
@@ -335,7 +363,7 @@ with tab1:
                     wywalczone = int(df_live[df_live["Zawodnik"] == p]["Pkt Turniejowe"].values[0])
                     st.session_state.history[p].append(wywalczone)
                 else:
-                    st.session_state.history[p].append(0)
+                    st.session_state.history[p].append(None)
             
             live_matrix_int = {"Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"]}
             for p in active_today:
@@ -362,12 +390,10 @@ with tab1:
     
     gen_rows = []
     for p, rounds in st.session_state.history.items():
-        total_suma = sum(rounds)
+        total_suma = sum([r for r in rounds if r is not None])
         row_dict = {"Zawodnik": p}
         for r_idx, r_pts in enumerate(rounds):
-            if r_pts == 0 and p in ['KRO','CYG','DAR','DOM','HAL','TAS','KAL','JAN'] and r_idx < 2:
-                row_dict[f"R{r_idx+1}"] = "-"
-            elif r_pts == 0 and r_idx >= 2:
+            if r_pts is None:
                 row_dict[f"R{r_idx+1}"] = "-"
             else:
                 row_dict[f"R{r_idx+1}"] = r_pts
