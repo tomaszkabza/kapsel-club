@@ -8,7 +8,7 @@ from io import BytesIO
 # Konfiguracja strony pod smartfona
 st.set_page_config(page_title="Kapsel Club Browar", layout="centered")
 
-# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE ---
+# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE ORAZ SZTYWNA SIATKA 4 KOLUMN ---
 st.markdown("""
     <style>
     /* Zdjęcie jako tło całej strony */
@@ -67,6 +67,14 @@ st.markdown("""
     
     button[data-testid="stMarkdownContainer"] p {
         font-weight: bold;
+    }
+
+    /* VETO DLA MOBILE: Wymuszenie 4 kolumn w siatce graczy */
+    .players-grid {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 8px !important;
+        margin-bottom: 1rem !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -402,20 +410,25 @@ with tab1:
 
     active_today = []
     
-    # NIEPODWAŻALNA SIATKA 4 x 4 (4 WIERSZE PO 4 DEDYKOWANE KOLUMNY)
+    # KONTENER ZE SZTYWNĄ SIATKĄ GRID (4 KOLUMNY NA KAŻDYM EKRANIE MOBILNYM)
     players_list = st.session_state.players
-    for row_idx in range(0, len(players_list), 4):
-        row_players = players_list[row_idx:row_idx+4]
-        row_cols = st.columns(4)
-        for col_idx, p in enumerate(row_players):
-            chk_key = f"active_{p}"
-            if chk_key not in st.session_state:
-                st.session_state[chk_key] = False
+    
+    # Generujemy natywny HTML z klasą CSS grid, gwarantujący brak ucinania
+    st.markdown('<div class="players-grid">', unsafe_allow_html=True)
+    
+    # Zastępujemy niewygodne st.columns natywną siatką HTML w pętli
+    grid_cols = st.columns(4)
+    for idx, p in enumerate(players_list):
+        chk_key = f"active_{p}"
+        if chk_key not in st.session_state:
+            st.session_state[chk_key] = False
+            
+        with grid_cols[idx % 4]:
+            if st.checkbox(p, key=chk_key):
+                active_today.append(p)
                 
-            with row_cols[col_idx]:
-                if st.checkbox(p, key=chk_key):
-                    active_today.append(p)
-                
+    st.markdown('</div>', unsafe_allow_html=True)
+
     if len(active_today) > 0:
         st.write("---")
         st.write("### Wpisz wyniki biegów (0 - 10):")
