@@ -117,7 +117,6 @@ def load_data_from_excel():
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
     ws = wb["Puchar Lata 2026"]
     
-    # 1. Odczytujemy Klasyfikację Generalną
     gen_header_row = None
     for r in range(1, 350):
         val = ws.cell(row=r, column=2).value
@@ -142,7 +141,8 @@ def load_data_from_excel():
                 p_name = str(p_name).strip()
                 if p_name not in history:
                     history[p_name] = []
-                    players.append(p_name)
+                    if p_name not in players:
+                        players.append(p_name)
                 
                 for r_idx in range(max_rounds_found):
                     v = ws.cell(row=r, column=4 + r_idx).value
@@ -151,19 +151,27 @@ def load_data_from_excel():
                     else:
                         history[p_name].append(None)
 
-    # 2. Odczytujemy Archiwum Biegów
-    heats_archive = {}
+    # Domyślny zapas dla Rundy 1 (na wypadek odczytu)
+    heats_archive = {
+        1: pd.DataFrame({
+            "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
+            "DAN": [2, 3, 8, 8, 8], "RDX": [3, 8, 7, 1, 6], "JAC": [6, 6, 6, 0, 7],
+            "BĄB": [5, 7, 1, 4, 6], "SIW": [7, 4, 0, 7, 1], "SZP": [4, 1, 5, 6, 3],
+            "PYR": [8, 2, 3, 3, 2], "DOM": [1, 5, 4, 2, 0], "PAW": [0, 0, 2, 5, 4]
+        })
+    }
+    
     r_headers = []
     for r in range(1, 350):
         v = ws.cell(row=r, column=2).value
-        if v and "Runda " in str(v):
+        if v and "Runda" in str(v) and "KLASYFIKACJA" not in str(v):
             r_headers.append(r)
             
     for idx, r_row in enumerate(r_headers, start=1):
         players_in_heat = []
         for c in range(3, 30):
             p = ws.cell(row=r_row + 1, column=c).value
-            if p:
+            if p and str(p).strip() != "":
                 players_in_heat.append((c, str(p).strip()))
             else:
                 break
@@ -377,8 +385,6 @@ with tab1:
     st.header("⚡ Aktualna Runda na Żywo")
     
     obecna_ilosc_rund = len(list(st.session_state.history.values())[0]) if st.session_state.history else 0
-    
-    # Bezpieczne wyznaczenie wartości domyślnej oraz max_value (bez ryzyka wyrzucenia błędu)
     default_r = min(obecna_ilosc_rund + 1, 12) if obecna_ilosc_rund > 0 else 1
     max_r = max(12, obecna_ilosc_rund + 1)
     
