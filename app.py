@@ -76,46 +76,6 @@ st.subheader("Oficjalny Panel Live • Puchar Lata 2026")
 
 EXCEL_FILE = "Puchar_Lata_2026_Browar.xlsx"
 
-# Inicjalizacja bazy Z UWZGLĘDNIENIEM RUNDY I, II ORAZ III
-if "initialized" not in st.session_state:
-    st.session_state.initialized = True
-    st.session_state.players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN']
-    
-    # Historia punktów po Rundach I, II oraz III
-    st.session_state.history = {
-        "RDX": [18, 14, 20], "SIW": [12, 16, 16], "DAN": [20, 20, None],
-        "BĄB": [14, 12, 12], "KAL": [None, None, 18], "SZP": [10, 3, 14],
-        "KRO": [None, 18, 8], "JAC": [16, 9, None], "PYR": [9, 6, 9],
-        "DAR": [None, 7, 10], "PAW": [7, 10, None], "DOM": [8, None, None],
-        "CYG": [None, 8, None], "HAL": [None, None, None], "TAS": [None, None, None],
-        "JAN": [None, None, None]
-    }
-    
-    # Archiwum biegowe Rund 1, 2 oraz 3
-    st.session_state.heats_archive = {
-        1: pd.DataFrame({
-            "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
-            "JAC": [5, 4, 3, 2, 2], "PAW": [2, 1, 2, 1, 1], "RDX": [8, 10, 8, 6, 7], 
-            "SIW": [4, 3, 4, 3, 4], "BĄB": [6, 7, 5, 4, 5], "SZP": [3, 2, 6, 5, 3],
-            "PYR": [1, 5, 1, 7, 6], "DAN": [10, 8, 10, 10, 10], "DOM": [7, 6, 7, 0, 0]
-        }),
-        2: pd.DataFrame({
-            "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
-            "JAC": [1, 1, 9, 10, 3], "DAR": [7, 5, 5, 3, 0], "CYG": [4, 4, 3, 9, 1],
-            "PAW": [6, 0, 6, 5, 8],  "RDX": [10, 7, 2, 0, 10], "KRO": [8, 8, 7, 8, 2],
-            "SIW": [3, 6, 10, 6, 6], "BĄB": [0, 10, 1, 7, 7], "SZP": [2, 2, 4, 1, 4],
-            "PYR": [5, 3, 0, 2, 5],  "DAN": [9, 9, 8, 4, 9]
-        }),
-        3: pd.DataFrame({
-            "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
-            "RDX": [7, 0, 6, 7, 5], "KAL": [1, 7, 7, 3, 7], "SIW": [3, 4, 5, 5, 2],
-            "SZP": [6, 3, 1, 6, 1], "BĄB": [2, 6, 2, 2, 4], "DAR": [5, 5, 0, 4, 0],
-            "PYR": [4, 1, 4, 1, 3], "KRO": [0, 2, 3, 0, 6]
-        })
-    }
-    st.session_state.excel_ready = False
-    st.session_state.excel_data = None
-
 def get_tournament_points(rank):
     pts_map = {1:20, 2:18, 3:16, 4:14, 5:12, 6:10, 7:9, 8:8, 9:7, 10:6, 11:5, 12:4, 13:3, 14:2, 15:1}
     return pts_map.get(int(rank), 0) if pd.notnull(rank) else 0
@@ -151,6 +111,87 @@ def style_matrix_like_excel(df):
         return styles
 
     return df_text.style.apply(get_row_styles, axis=1)
+
+# FUNKCJA ODZYTWANIA ZAWARTOŚCI Z PLIKU EXCEL
+def load_data_from_excel():
+    wb = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
+    ws = wb["Puchar Lata 2026"]
+    
+    # 1. Odczytujemy Klasyfikację Generalną
+    gen_header_row = None
+    for r in range(1, 350):
+        val = ws.cell(row=r, column=2).value
+        if val and "KLASYFIKACJA GENERALNA PUCHARU" in str(val):
+            gen_header_row = r + 1
+            break
+            
+    players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN']
+    history = {p: [] for p in players}
+    
+    # Odczytujemy dotychczasowe rundy z Generałki
+    max_rounds_found = 0
+    if gen_header_row:
+        # Szukamy ile jest rozegranych rund (sprawdzamy nagłówki R1, R2...)
+        for c in range(4, 16):
+            if ws.cell(row=gen_header_row, column=c).value:
+                max_rounds_found += 1
+            else:
+                break
+                
+        for r in range(gen_header_row + 1, gen_header_row + 30):
+            p_name = ws.cell(row=r, column=3).value
+            if p_name:
+                p_name = str(p_name).strip()
+                if p_name not in history:
+                    history[p_name] = []
+                    players.append(p_name)
+                
+                for r_idx in range(max_rounds_found):
+                    v = ws.cell(row=r, column=4 + r_idx).value
+                    if v and isinstance(v, (int, float)):
+                        history[p_name].append(int(v))
+                    else:
+                        history[p_name].append(None)
+
+    # 2. Odczytujemy Archiwum Biegów
+    heats_archive = {}
+    r_headers = []
+    for r in range(1, 350):
+        v = ws.cell(row=r, column=2).value
+        if v and "Runda " in str(v):
+            r_headers.append(r)
+            
+    for idx, r_row in enumerate(r_headers, start=1):
+        # Nagłówek graczy jest w r_row + 1
+        players_in_heat = []
+        for c in range(3, 30):
+            p = ws.cell(row=r_row + 1, column=c).value
+            if p:
+                players_in_heat.append((c, str(p).strip()))
+            else:
+                break
+                
+        if players_in_heat:
+            heat_dict = {"Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"]}
+            for col_idx, p_code in players_in_heat:
+                scores = []
+                for b in range(5):
+                    val = ws.cell(row=r_row + 2 + b, column=col_idx).value
+                    scores.append(int(val) if val is not None and isinstance(val, (int, float)) else 0)
+                heat_dict[p_code] = scores
+            heats_archive[idx] = pd.DataFrame(heat_dict)
+
+    return players, history, heats_archive
+
+# INICJALIZACJA Z PLIKU EXCEL
+if "initialized" not in st.session_state:
+    st.session_state.initialized = True
+    players, history, heats_archive = load_data_from_excel()
+    st.session_state.players = players
+    st.session_state.history = history
+    st.session_state.heats_archive = heats_archive
+    st.session_state.excel_ready = False
+    st.session_state.excel_data = None
 
 def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsza):
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
@@ -340,7 +381,7 @@ with tab1:
     
     obecna_ilosc_rund = len(list(st.session_state.history.values())[0])
     nr_rundy = st.number_input("Numer rozgrywanej rundy", min_value=1, max_value=12, value=obecna_ilosc_rund + 1)
-    data_dzisiejsza = st.text_input("Data dzisiejszych zawodów:", value="31.07.2026")
+    data_dzisiejsza = st.text_input("Data dzisiejszych zawodów:", value="07.08.2026")
     
     st.write("**Zaznacz zawodników startujących dzisiaj:**")
     active_today = []
