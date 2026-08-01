@@ -76,16 +76,22 @@ st.subheader("Oficjalny Panel Live • Puchar Lata 2026")
 
 EXCEL_FILE = "Puchar_Lata_2026_Browar.xlsx"
 
-# Inicjalizacja bazy
+# Inicjalizacja bazy Z UWZGLĘDNIENIEM RUNDY I, II ORAZ III
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
     st.session_state.players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN']
+    
+    # Historia punktów po Rundach I, II oraz III
     st.session_state.history = {
-        "DAN": [20, 20], "RDX": [18, 14], "SIW": [12, 16], "BĄB": [14, 12],
-        "JAC": [16, 9],  "KRO": [None, 18], "PAW": [7, 10], "PYR": [9, 6],
-        "SZP": [10, 3],  "DOM": [8, None],  "CYG": [None, 8], "DAR": [None, 7],
-        "HAL": [None, None], "TAS": [None, None], "KAL": [None, None], "JAN": [None, None]
+        "RDX": [18, 14, 20], "SIW": [12, 16, 16], "DAN": [20, 20, None],
+        "BĄB": [14, 12, 12], "KAL": [None, None, 18], "SZP": [10, 3, 14],
+        "KRO": [None, 18, 8], "JAC": [16, 9, None], "PYR": [9, 6, 9],
+        "DAR": [None, 7, 10], "PAW": [7, 10, None], "DOM": [8, None, None],
+        "CYG": [None, 8, None], "HAL": [None, None, None], "TAS": [None, None, None],
+        "JAN": [None, None, None]
     }
+    
+    # Archiwum biegowe Rund 1, 2 oraz 3
     st.session_state.heats_archive = {
         1: pd.DataFrame({
             "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
@@ -99,6 +105,12 @@ if "initialized" not in st.session_state:
             "PAW": [6, 0, 6, 5, 8],  "RDX": [10, 7, 2, 0, 10], "KRO": [8, 8, 7, 8, 2],
             "SIW": [3, 6, 10, 6, 6], "BĄB": [0, 10, 1, 7, 7], "SZP": [2, 2, 4, 1, 4],
             "PYR": [5, 3, 0, 2, 5],  "DAN": [9, 9, 8, 4, 9]
+        }),
+        3: pd.DataFrame({
+            "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
+            "RDX": [7, 0, 6, 7, 5], "KAL": [1, 7, 7, 3, 7], "SIW": [3, 4, 5, 5, 2],
+            "SZP": [6, 3, 1, 6, 1], "BĄB": [2, 6, 2, 2, 4], "DAR": [5, 5, 0, 4, 0],
+            "PYR": [4, 1, 4, 1, 3], "KRO": [0, 2, 3, 0, 6]
         })
     }
     st.session_state.excel_ready = False
@@ -144,7 +156,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=False)
     ws = wb["Puchar Lata 2026"]
     
-    # 1. Odnajdujemy sekcję Klasyfikacji Generalnej
     gen_header_row = None
     for row in range(1, 300):
         val = ws.cell(row=row, column=2).value
@@ -181,7 +192,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
     
     active_sorted = list(df_live_results["Zawodnik"].values)
     
-    # Nagłówek nowej rundy
     ws.cell(row=start_r, column=2, value="Bieg").font = font_bold
     ws.cell(row=start_r, column=2).fill = fill_green_head
     ws.cell(row=start_r, column=2).font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
@@ -196,7 +206,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.border = thin_border
     start_r += 1
     
-    # Bieg 1-5
     for b in range(5):
         ws.cell(row=start_r, column=2, value=f"Bieg {b+1}").font = font_bold
         ws.cell(row=start_r, column=2).border = thin_border
@@ -209,7 +218,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
             cell.alignment = Alignment(horizontal="center")
         start_r += 1
         
-    # Suma
     cell_lbl1 = ws.cell(row=start_r, column=2, value="Suma punktów")
     cell_lbl1.font = font_bold; cell_lbl1.fill = fill_yellow_light; cell_lbl1.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
@@ -217,7 +225,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.font = font_bold; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
     start_r += 1
     
-    # Średnia
     cell_lbl2 = ws.cell(row=start_r, column=2, value="Średnia na bieg")
     cell_lbl2.font = font_bold; cell_lbl2.fill = fill_yellow_light; cell_lbl2.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
@@ -225,7 +232,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.font = font_normal; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
     start_r += 1
     
-    # Miejsce
     cell_lbl3 = ws.cell(row=start_r, column=2, value="Miejsce")
     cell_lbl3.font = font_bold; cell_lbl3.fill = fill_gray_light; cell_lbl3.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
@@ -233,14 +239,12 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
         cell.font = font_normal; cell.fill = fill_gray_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
     start_r += 1
     
-    # Pkt Turniejowe
     cell_lbl4 = ws.cell(row=start_r, column=2, value="Punkty Turniejowe")
     cell_lbl4.font = font_bold; cell_lbl4.fill = fill_yellow_light; cell_lbl4.border = thin_border
     for c_idx, player in enumerate(active_sorted, start=3):
         cell = ws.cell(row=start_r, column=c_idx, value=int(df_live_results[df_live_results["Zawodnik"] == player]["Pkt Turniejowe"].values[0]))
         cell.font = font_bold; cell.fill = fill_yellow_light; cell.border = thin_border; cell.alignment = Alignment(horizontal="center")
         
-    # Naprawiamy wiersze w starych rundach
     for r in range(1, start_r):
         v = ws.cell(row=r, column=2).value
         if v == "Suma punktów":
@@ -259,7 +263,6 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
                         pt_cell = ws.cell(row=r+3, column=c, value=get_tournament_points(m_val))
                         pt_cell.font = font_bold; pt_cell.fill = fill_yellow_light; pt_cell.border = thin_border; pt_cell.alignment = Alignment(horizontal="center")
 
-    # 2. ODNOWIENIE, DOPISYWANIE ZAWODNIKÓW, STYLIZACJA I SORTOWANIE GENERALKI
     new_gen_header = None
     for row in range(1, 350):
         val = ws.cell(row=row, column=2).value
@@ -307,27 +310,20 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
 
     rows_data_sorted = sorted(rows_data, key=lambda x: x["suma"], reverse=True)
 
-    # NAKŁADANIE STYLIZACJI DLA CAŁEJ STAWKI (NAPRZAMIENNIE ZIELONY/BIAŁY + ŻÓŁTA SUMA + RAMKI)
     for idx, item in enumerate(rows_data_sorted, start=1):
         curr_r = new_gen_header + idx
-        
-        # Wybór tła: wiersze nieparzyste (1, 3, 5...) zielone, parzyste (2, 4, 6...) białe
         current_row_fill = fill_green_row if idx % 2 != 0 else fill_white_row
         
-        # Poz.
         cell_p = ws.cell(row=curr_r, column=2, value=idx)
         cell_p.font = font_bold; cell_p.fill = current_row_fill; cell_p.border = thin_border; cell_p.alignment = Alignment(horizontal="center")
         
-        # Zawodnik
         cell_z = ws.cell(row=curr_r, column=3, value=item["zawodnik"])
         cell_z.font = font_bold; cell_z.fill = current_row_fill; cell_z.border = thin_border; cell_z.alignment = Alignment(horizontal="center")
         
-        # Rundy R1-R12
         for r_i, r_val in enumerate(item["rundy"]):
             cell_rv = ws.cell(row=curr_r, column=4 + r_i, value=r_val)
             cell_rv.font = font_normal; cell_rv.fill = current_row_fill; cell_rv.border = thin_border; cell_rv.alignment = Alignment(horizontal="center")
             
-        # SUMA (zawsze pastelowy żółty)
         cell_s = ws.cell(row=curr_r, column=16, value=item["suma"])
         cell_s.font = font_bold; cell_s.fill = fill_yellow_light; cell_s.border = thin_border; cell_s.alignment = Alignment(horizontal="center")
 
@@ -344,7 +340,7 @@ with tab1:
     
     obecna_ilosc_rund = len(list(st.session_state.history.values())[0])
     nr_rundy = st.number_input("Numer rozgrywanej rundy", min_value=1, max_value=12, value=obecna_ilosc_rund + 1)
-    data_dzisiejsza = st.text_input("Data dzisiejszych zawodów:", value="24.07.2026")
+    data_dzisiejsza = st.text_input("Data dzisiejszych zawodów:", value="31.07.2026")
     
     st.write("**Zaznacz zawodników startujących dzisiaj:**")
     active_today = []
