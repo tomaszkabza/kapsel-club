@@ -8,7 +8,7 @@ from io import BytesIO
 # Konfiguracja strony pod smartfona
 st.set_page_config(page_title="Kapsel Club Browar", layout="centered")
 
-# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE ORAZ SIATKĄ DLA CHECKBOXÓW ---
+# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE ---
 st.markdown("""
     <style>
     /* Zdjęcie jako tło całej strony */
@@ -57,20 +57,6 @@ st.markdown("""
     div[data-testid="stDownloadButton"] > button:hover {
         background-color: #1B5E20;
         color: #FFFFFF;
-    }
-
-    /* WYMUSZENIE SIATKI 4 KOLUMN NA TELEFONIE DLA ZAWODNIKÓW */
-    div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: wrap !important;
-    }
-    
-    div[data-testid="stHorizontalBlock"] > div {
-        flex: 1 1 22% !important;
-        min-width: 22% !important;
-        max-width: 25% !important;
-        padding: 2px !important;
     }
 
     /* Wygląd tabel w aplikacji */
@@ -416,16 +402,19 @@ with tab1:
 
     active_today = []
     
-    # Tworzymy stałą siatkę 4-kolumnową
-    cols = st.columns(4)
-    for idx, p in enumerate(st.session_state.players):
-        chk_key = f"active_{p}"
-        if chk_key not in st.session_state:
-            st.session_state[chk_key] = False
-            
-        with cols[idx % 4]:
-            if st.checkbox(p, key=chk_key):
-                active_today.append(p)
+    # NIEPODWAŻALNA SIATKA 4 x 4 (4 WIERSZE PO 4 DEDYKOWANE KOLUMNY)
+    players_list = st.session_state.players
+    for row_idx in range(0, len(players_list), 4):
+        row_players = players_list[row_idx:row_idx+4]
+        row_cols = st.columns(4)
+        for col_idx, p in enumerate(row_players):
+            chk_key = f"active_{p}"
+            if chk_key not in st.session_state:
+                st.session_state[chk_key] = False
+                
+            with row_cols[col_idx]:
+                if st.checkbox(p, key=chk_key):
+                    active_today.append(p)
                 
     if len(active_today) > 0:
         st.write("---")
