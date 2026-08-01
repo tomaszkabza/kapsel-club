@@ -8,7 +8,7 @@ from io import BytesIO
 # Konfiguracja strony pod smartfona
 st.set_page_config(page_title="Kapsel Club Browar", layout="centered")
 
-# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE ---
+# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE ORAZ SIATKĄ DLA CHECKBOXÓW ---
 st.markdown("""
     <style>
     /* Zdjęcie jako tło całej strony */
@@ -23,10 +23,10 @@ st.markdown("""
     /* Półprzezroczyste białe tło pod tekstami dla idealnej czytelności na słońcu */
     .block-container {
         background-color: rgba(255, 255, 255, 0.94);
-        padding: 2rem;
+        padding: 1.5rem;
         border-radius: 10px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-        margin-top: 2rem;
+        margin-top: 1rem;
     }
     
     /* Główne nagłówki - Klubowa Zieleń */
@@ -57,6 +57,20 @@ st.markdown("""
     div[data-testid="stDownloadButton"] > button:hover {
         background-color: #1B5E20;
         color: #FFFFFF;
+    }
+
+    /* WYMUSZENIE SIATKI 4 KOLUMN NA TELEFONIE DLA ZAWODNIKÓW */
+    div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+    }
+    
+    div[data-testid="stHorizontalBlock"] > div {
+        flex: 1 1 22% !important;
+        min-width: 22% !important;
+        max-width: 25% !important;
+        padding: 2px !important;
     }
 
     /* Wygląd tabel w aplikacji */
@@ -390,7 +404,6 @@ with tab1:
     
     st.write("**Zaznacz zawodników startujących dzisiaj:**")
     
-    # Przycisk szybkiego zaznaczania / odznaczania wszystkich
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
         if st.button("☑️ Zaznacz wszystkich"):
@@ -402,9 +415,10 @@ with tab1:
                 st.session_state[f"active_{p}"] = False
 
     active_today = []
+    
+    # Tworzymy stałą siatkę 4-kolumnową
     cols = st.columns(4)
     for idx, p in enumerate(st.session_state.players):
-        # Domyślnie domyślamy się False (czysta lista)
         chk_key = f"active_{p}"
         if chk_key not in st.session_state:
             st.session_state[chk_key] = False
