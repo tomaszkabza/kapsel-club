@@ -112,7 +112,7 @@ def style_matrix_like_excel(df):
 
     return df_text.style.apply(get_row_styles, axis=1)
 
-# FUNKCJA ODZYTWANIA ZAWARTOŚCI Z PLIKU EXCEL
+# FUNKCJA ODCZYTYWANIA ZAWARTOŚCI Z PLIKU EXCEL
 def load_data_from_excel():
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
     ws = wb["Puchar Lata 2026"]
@@ -128,10 +128,8 @@ def load_data_from_excel():
     players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN']
     history = {p: [] for p in players}
     
-    # Odczytujemy dotychczasowe rundy z Generałki
     max_rounds_found = 0
     if gen_header_row:
-        # Szukamy ile jest rozegranych rund (sprawdzamy nagłówki R1, R2...)
         for c in range(4, 16):
             if ws.cell(row=gen_header_row, column=c).value:
                 max_rounds_found += 1
@@ -162,7 +160,6 @@ def load_data_from_excel():
             r_headers.append(r)
             
     for idx, r_row in enumerate(r_headers, start=1):
-        # Nagłówek graczy jest w r_row + 1
         players_in_heat = []
         for c in range(3, 30):
             p = ws.cell(row=r_row + 1, column=c).value
@@ -379,8 +376,13 @@ tab1, tab2 = st.tabs(["🏠 STRONA GŁÓWNA (LIVE & GENERALNA)", "📚 HISTORIA 
 with tab1:
     st.header("⚡ Aktualna Runda na Żywo")
     
-    obecna_ilosc_rund = len(list(st.session_state.history.values())[0])
-    nr_rundy = st.number_input("Numer rozgrywanej rundy", min_value=1, max_value=12, value=obecna_ilosc_rund + 1)
+    obecna_ilosc_rund = len(list(st.session_state.history.values())[0]) if st.session_state.history else 0
+    
+    # Bezpieczne wyznaczenie wartości domyślnej oraz max_value (bez ryzyka wyrzucenia błędu)
+    default_r = min(obecna_ilosc_rund + 1, 12) if obecna_ilosc_rund > 0 else 1
+    max_r = max(12, obecna_ilosc_rund + 1)
+    
+    nr_rundy = st.number_input("Numer rozgrywanej rundy", min_value=1, max_value=max_r, value=default_r)
     data_dzisiejsza = st.text_input("Data dzisiejszych zawodów:", value="07.08.2026")
     
     st.write("**Zaznacz zawodników startujących dzisiaj:**")
