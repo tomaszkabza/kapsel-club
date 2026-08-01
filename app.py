@@ -112,7 +112,6 @@ def style_matrix_like_excel(df):
 
     return df_text.style.apply(get_row_styles, axis=1)
 
-# FUNKCJA ODCZYTYWANIA ZAWARTOŚCI Z PLIKU EXCEL
 def load_data_from_excel():
     wb = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
     ws = wb["Puchar Lata 2026"]
@@ -151,7 +150,6 @@ def load_data_from_excel():
                     else:
                         history[p_name].append(None)
 
-    # Domyślny zapas dla Rundy 1 (na wypadek odczytu)
     heats_archive = {
         1: pd.DataFrame({
             "Bieg": ["Bieg 1", "Bieg 2", "Bieg 3", "Bieg 4", "Bieg 5"],
@@ -188,7 +186,6 @@ def load_data_from_excel():
 
     return players, history, heats_archive
 
-# INICJALIZACJA Z PLIKU EXCEL
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
     players, history, heats_archive = load_data_from_excel()
@@ -392,11 +389,28 @@ with tab1:
     data_dzisiejsza = st.text_input("Data dzisiejszych zawodów:", value="07.08.2026")
     
     st.write("**Zaznacz zawodników startujących dzisiaj:**")
+    
+    # Przycisk szybkiego zaznaczania / odznaczania wszystkich
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        if st.button("☑️ Zaznacz wszystkich"):
+            for p in st.session_state.players:
+                st.session_state[f"active_{p}"] = True
+    with btn_col2:
+        if st.button("⬜ Odznacz wszystkich"):
+            for p in st.session_state.players:
+                st.session_state[f"active_{p}"] = False
+
     active_today = []
     cols = st.columns(4)
     for idx, p in enumerate(st.session_state.players):
+        # Domyślnie domyślamy się False (czysta lista)
+        chk_key = f"active_{p}"
+        if chk_key not in st.session_state:
+            st.session_state[chk_key] = False
+            
         with cols[idx % 4]:
-            if st.checkbox(p, key=f"active_{p}", value=True):
+            if st.checkbox(p, key=chk_key):
                 active_today.append(p)
                 
     if len(active_today) > 0:
