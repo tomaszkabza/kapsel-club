@@ -123,7 +123,6 @@ def load_data_from_excel():
             gen_header_row = r + 1
             break
             
-    # Lista oficjalna z dodanym zawodnikiem DAH
     players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN', 'DAH']
     history = {p: [] for p in players}
     
@@ -411,8 +410,11 @@ with tab1:
     )
 
     if len(active_today) > 0:
+        # DYNAMICZNY MAX PUNKTÓW W BIEGU NA PODSTAWIE LICZBY STARTUJĄCYCH ZAWODNIKÓW
+        max_heat_points = len(active_today) - 1
+        
         st.write("---")
-        st.write("### Wpisz wyniki biegów (0 - 10):")
+        st.write(f"### Wpisz wyniki biegów (0 - {max_heat_points}):")
         
         scores = {}
         for p in active_today:
@@ -421,7 +423,7 @@ with tab1:
             p_scores = []
             for b in range(5):
                 with p_cols[b]:
-                    val = st.number_input(f"Bieg {b+1}", min_value=0, max_value=10, value=0, key=f"score_{p}_{b}")
+                    val = st.number_input(f"Bieg {b+1}", min_value=0, max_value=max_heat_points, value=0, key=f"score_{p}_{b}")
                     p_scores.append(val)
             scores[p] = p_scores
             
