@@ -410,7 +410,6 @@ with tab1:
     )
 
     if len(active_today) > 0:
-        # DYNAMICZNY MAX PUNKTÓW W BIEGU NA PODSTAWIE LICZBY STARTUJĄCYCH ZAWODNIKÓW
         max_heat_points = len(active_today) - 1
         
         st.write("---")
