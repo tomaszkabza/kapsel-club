@@ -8,7 +8,7 @@ from io import BytesIO
 # Konfiguracja strony pod smartfona
 st.set_page_config(page_title="Kapsel Club Browar", layout="centered")
 
-# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE ORAZ SZTYWNA SIATKA 4 KOLUMN ---
+# --- KLUBOWA STYLIZACJA CSS Z GRAFIKĄ W TLE ---
 st.markdown("""
     <style>
     /* Zdjęcie jako tło całej strony */
@@ -68,14 +68,6 @@ st.markdown("""
     button[data-testid="stMarkdownContainer"] p {
         font-weight: bold;
     }
-
-    /* VETO DLA MOBILE: Wymuszenie 4 kolumn w siatce graczy */
-    .players-grid {
-        display: grid !important;
-        grid-template-columns: repeat(4, 1fr) !important;
-        gap: 8px !important;
-        margin-bottom: 1rem !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -131,7 +123,8 @@ def load_data_from_excel():
             gen_header_row = r + 1
             break
             
-    players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN']
+    # Lista oficjalna z dodanym zawodnikiem DAH
+    players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN', 'DAH']
     history = {p: [] for p in players}
     
     max_rounds_found = 0
@@ -142,7 +135,7 @@ def load_data_from_excel():
             else:
                 break
                 
-        for r in range(gen_header_row + 1, gen_header_row + 30):
+        for r in range(gen_header_row + 1, gen_header_row + 35):
             p_name = ws.cell(row=r, column=3).value
             if p_name:
                 p_name = str(p_name).strip()
@@ -396,38 +389,26 @@ with tab1:
     nr_rundy = st.number_input("Numer rozgrywanej rundy", min_value=1, max_value=max_r, value=default_r)
     data_dzisiejsza = st.text_input("Data dzisiejszych zawodów:", value="07.08.2026")
     
-    st.write("**Zaznacz zawodników startujących dzisiaj:**")
+    st.write("**Wybierz zawodników startujących dzisiaj:**")
     
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
         if st.button("☑️ Zaznacz wszystkich"):
-            for p in st.session_state.players:
-                st.session_state[f"active_{p}"] = True
+            st.session_state["selected_players"] = st.session_state.players.copy()
     with btn_col2:
         if st.button("⬜ Odznacz wszystkich"):
-            for p in st.session_state.players:
-                st.session_state[f"active_{p}"] = False
+            st.session_state["selected_players"] = []
 
-    active_today = []
-    
-    # KONTENER ZE SZTYWNĄ SIATKĄ GRID (4 KOLUMNY NA KAŻDYM EKRANIE MOBILNYM)
-    players_list = st.session_state.players
-    
-    # Generujemy natywny HTML z klasą CSS grid, gwarantujący brak ucinania
-    st.markdown('<div class="players-grid">', unsafe_allow_html=True)
-    
-    # Zastępujemy niewygodne st.columns natywną siatką HTML w pętli
-    grid_cols = st.columns(4)
-    for idx, p in enumerate(players_list):
-        chk_key = f"active_{p}"
-        if chk_key not in st.session_state:
-            st.session_state[chk_key] = False
-            
-        with grid_cols[idx % 4]:
-            if st.checkbox(p, key=chk_key):
-                active_today.append(p)
-                
-    st.markdown('</div>', unsafe_allow_html=True)
+    if "selected_players" not in st.session_state:
+        st.session_state["selected_players"] = []
+
+    active_today = st.multiselect(
+        "Lista obecności na rundę:",
+        options=st.session_state.players,
+        default=st.session_state["selected_players"],
+        key="selected_players",
+        placeholder="Kliknij i wybierz obecnych dzisiaj..."
+    )
 
     if len(active_today) > 0:
         st.write("---")
