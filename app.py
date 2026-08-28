@@ -123,8 +123,8 @@ def load_data_from_excel():
             gen_header_row = r + 1
             break
             
-    # Lista oficjalna z dodanymi zawodnikami BĄC i ROM
-    players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN', 'DAH', 'BĄC', 'ROM']
+    # Lista oficjalna z dodanymi zawodnikami BAR, BĄC, ROM, DAH
+    players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN', 'DAH', 'BĄC', 'ROM', 'BAR']
     history = {p: [] for p in players}
     
     max_rounds_found = 0
@@ -135,7 +135,7 @@ def load_data_from_excel():
             else:
                 break
                 
-        for r in range(gen_header_row + 1, gen_header_row + 40):
+        for r in range(gen_header_row + 1, gen_header_row + 50):
             p_name = ws.cell(row=r, column=3).value
             if p_name:
                 p_name = str(p_name).strip()
@@ -315,7 +315,7 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
             break
 
     existing_players = {}
-    for r in range(new_gen_header + 1, new_gen_header + 45):
+    for r in range(new_gen_header + 1, new_gen_header + 50):
         z_name = ws.cell(row=r, column=3).value
         if z_name:
             z_name = str(z_name).strip()
