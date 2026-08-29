@@ -123,7 +123,6 @@ def load_data_from_excel():
             gen_header_row = r + 1
             break
             
-    # Lista oficjalna z dodanymi zawodnikami BAR, BĄC, ROM, DAH
     players = ['DAN', 'RDX', 'SIW', 'BĄB', 'JAC', 'KRO', 'PAW', 'PYR', 'SZP', 'DOM', 'CYG', 'DAR', 'HAL', 'TAS', 'KAL', 'JAN', 'DAH', 'BĄC', 'ROM', 'BAR']
     history = {p: [] for p in players}
     
@@ -342,17 +341,22 @@ def update_original_excel(nr_rundy, scores_dict, df_live_results, data_dzisiejsz
     rows_data = []
     for p, r_row in existing_players.items():
         r_vals = []
+        raw_numeric_vals = []
         row_sum = 0
         for c in range(4, 16):
             val = ws.cell(row=r_row, column=c).value
             if val and isinstance(val, (int, float)):
                 r_vals.append(int(val))
+                raw_numeric_vals.append(int(val))
                 row_sum += int(val)
             else:
                 r_vals.append("-")
-        rows_data.append({"zawodnik": p, "rundy": r_vals, "suma": row_sum})
+        # Do tie-breakera w Generalce: posortowane punkty rund malejąco
+        sorted_round_pts = sorted(raw_numeric_vals, reverse=True)
+        rows_data.append({"zawodnik": p, "rundy": r_vals, "suma": row_sum, "tie_breaker": sorted_round_pts})
 
-    rows_data_sorted = sorted(rows_data, key=lambda x: x["suma"], reverse=True)
+    # SORTOWANIE GENERALKI: Suma pkt, a przy remisie najlepsze poszczególne zdobycze rund
+    rows_data_sorted = sorted(rows_data, key=lambda x: (x["suma"], x["tie_breaker"]), reverse=True)
 
     for idx, item in enumerate(rows_data_sorted, start=1):
         curr_r = new_gen_header + idx
@@ -434,10 +438,20 @@ with tab1:
         for p, b_vals in scores.items():
             suma = sum(b_vals)
             srednia = round(np.mean(b_vals), 1)
-            live_rows.append({"Zawodnik": p, "Suma": float(suma), "Średnia": float(srednia)})
+            # Tworzymy listę biegów posortowaną malejąco do tie-breakera
+            sorted_heats = sorted(b_vals, reverse=True)
+            live_rows.append({
+                "Zawodnik": p, 
+                "Suma": float(suma), 
+                "Średnia": float(srednia),
+                "tie_breaker": sorted_heats
+            })
             
-        df_live = pd.DataFrame(live_rows)
-        df_live = df_live.sort_values(by="Suma", ascending=False).reset_index(drop=True)
+        # SORTOWANIE RUNDY NA ŻYWO: Suma pkt, a przy remisie najwyższe pojedyncze biegi
+        live_rows_sorted = sorted(live_rows, key=lambda x: (x["Suma"], x["tie_breaker"]), reverse=True)
+        
+        df_live = pd.DataFrame(live_rows_sorted)
+        df_live.drop(columns=["tie_breaker"], inplace=True)
         df_live.index += 1
         df_live.insert(0, 'Miejsce', df_live.index)
         df_live["Pkt Turniejowe"] = df_live["Miejsce"].apply(get_tournament_points)
@@ -500,6 +514,9 @@ with tab1:
     gen_rows = []
     for p, rounds in st.session_state.history.items():
         total_suma = sum([r for r in rounds if r is not None])
+        raw_numeric_rounds = [r for r in rounds if r is not None]
+        sorted_rounds = sorted(raw_numeric_rounds, reverse=True)
+        
         row_dict = {"Zawodnik": p}
         for r_idx, r_pts in enumerate(rounds):
             if r_pts is None:
@@ -507,10 +524,15 @@ with tab1:
             else:
                 row_dict[f"R{r_idx+1}"] = r_pts
         row_dict["SUMA PUNKTÓW"] = total_suma
+        row_dict["tie_breaker"] = sorted_rounds
         gen_rows.append(row_dict)
         
-    df_gen = pd.DataFrame(gen_rows)
-    df_gen = df_gen.sort_values(by="SUMA PUNKTÓW", ascending=False).reset_index(drop=True)
+    # Sortowanie tabeli generalnej w UI z uwzględnieniem tie-breakera
+    gen_rows_sorted = sorted(gen_rows, key=lambda x: (x["SUMA PUNKTÓW"], x["tie_breaker"]), reverse=True)
+    for item in gen_rows_sorted:
+        del item["tie_breaker"]
+        
+    df_gen = pd.DataFrame(gen_rows_sorted)
     df_gen.index += 1
     df_gen.insert(0, 'Poz.', df_gen.index)
     
@@ -527,9 +549,18 @@ with tab2:
         df_arch = st.session_state.heats_archive[wybrana_runda].copy()
         player_cols = [c for c in df_arch.columns if c != "Bieg"]
         
-        sorted_cols_by_sum = sorted(player_cols, key=lambda p: df_arch[p].sum(), reverse=True)
-        df_arch = df_arch[["Bieg"] + sorted_cols_by_sum]
+        # Tie-breaker dla historii rund
+        player_data_for_sort = []
+        for p in player_cols:
+            p_scores = list(df_arch[p].values)
+            p_sum = sum(p_scores)
+            p_sorted_heats = sorted(p_scores, reverse=True)
+            player_data_for_sort.append({"zawodnik": p, "suma": p_sum, "tie_breaker": p_sorted_heats, "scores": p_scores})
+            
+        player_data_for_sort = sorted(player_data_for_sort, key=lambda x: (x["suma"], x["tie_breaker"]), reverse=True)
+        sorted_cols_by_sum = [x["zawodnik"] for x in player_data_for_sort]
         
+        df_arch = df_arch[["Bieg"] + sorted_cols_by_sum]
         for col in sorted_cols_by_sum:
             df_arch[col] = df_arch[col].astype(float)
             
@@ -538,22 +569,11 @@ with tab2:
         ranks = ["Miejsce"]
         t_points = ["Punkty Turniejowe"]
         
-        player_totals = {}
-        for p in sorted_cols_by_sum:
-            s_val = df_arch[p].sum()
-            player_totals[p] = s_val
-            sums.append(float(s_val))
-            averages.append(float(df_arch[p].mean()))
-            
-        sorted_players_by_sum = sorted(player_totals.items(), key=lambda x: x[1], reverse=True)
-        player_ranks = {}
-        for rank_idx, (p, _) in enumerate(sorted_players_by_sum):
-            player_ranks[p] = rank_idx + 1
-            
-        for p in sorted_cols_by_sum:
-            rk = player_ranks[p]
-            ranks.append(float(rk))
-            t_points.append(float(get_tournament_points(rk)))
+        for rank_idx, item in enumerate(player_data_for_sort, start=1):
+            sums.append(float(item["suma"]))
+            averages.append(float(np.mean(item["scores"])))
+            ranks.append(float(rank_idx))
+            t_points.append(float(get_tournament_points(rank_idx)))
             
         df_extra = pd.DataFrame(columns=df_arch.columns)
         df_extra.loc[len(df_extra)] = sums
